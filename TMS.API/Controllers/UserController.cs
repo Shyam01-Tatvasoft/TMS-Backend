@@ -21,7 +21,7 @@ public class UserController : ControllerBase
         this._response = new();
     }
 
-    // [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpGet("GatUsers")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]

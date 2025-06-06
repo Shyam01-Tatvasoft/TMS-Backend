@@ -10,13 +10,15 @@ using TMS.Service.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddCors(options => {
+builder.Services.AddCors(options =>
+{
     options.AddPolicy("AllowSpecificOrigin",
         policy =>
         {
-            policy.WithOrigins("http://127.0.0.1:5500") // Replace with your frontend URL
+            policy.WithOrigins("http://127.0.0.1:5500")
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials();
         });
 });
 // Add services to the container.
@@ -31,7 +33,11 @@ builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
     .AddJwtBearer(options =>
     {
         options.RequireHttpsMetadata = false;
@@ -73,34 +79,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c => 
+builder.Services.AddSwaggerGen(c =>
 {
-    //  c.SwaggerDoc("v1", new() { Title = "TMS", Version = "v1" });
+    c.SwaggerDoc("v1", new() { Title = "TMS", Version = "v1" });
 
-    // // Add JWT Bearer
-    // c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-    // {
-    //     Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
-    //     Name = "Authorization",
-    //     In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-    //     Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
-    //     Scheme = "bearer"
-    // });
+    // Add JWT Bearer
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer"
+    });
 
-    // c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
-    // {
-    //     {
-    //         new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-    //         {
-    //             Reference = new Microsoft.OpenApi.Models.OpenApiReference
-    //             {
-    //                 Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-    //                 Id = "Bearer"
-    //             }
-    //         },
-    //         Array.Empty<string>()
-    //     }
-    // });
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 var app = builder.Build();
@@ -114,6 +120,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowAll");
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
