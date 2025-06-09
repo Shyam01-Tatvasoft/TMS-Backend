@@ -1,6 +1,8 @@
+using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
 
@@ -13,12 +15,14 @@ public class AuthenticationController : ControllerBase
 {
     private readonly IAuthenticationService _autService;
     private readonly IJWTService _jwtService;
+    private readonly ICountryService _countryService;
     private readonly APIResponse _response;
 
-    public AuthenticationController(IAuthenticationService autService, IJWTService jwtService)
+    public AuthenticationController(IAuthenticationService autService, IJWTService jwtService, ICountryService countryService)
     {
         _autService = autService;
         _jwtService = jwtService;
+        _countryService = countryService;
         this._response = new();
     }
 
@@ -91,4 +95,49 @@ public class AuthenticationController : ControllerBase
         return Ok(_response);
     }
 
+    [HttpGet("countries")]
+    public async Task<ActionResult<APIResponse>> GetCountries()
+    {
+        try
+        {
+            _response.StatusCode = HttpStatusCode.OK;
+            _response.IsSuccess = true;
+            _response.Result = await _countryService.GetCountries();
+            return Ok(_response);
+        }
+        catch (System.Exception ex)
+        {
+            _response.IsSuccess = false;
+            _response.StatusCode = HttpStatusCode.InternalServerError;
+            _response.ErrorMessage = new List<string> { ex.Message };
+            return StatusCode((int)HttpStatusCode.InternalServerError, _response);
+        }
+    }
+
+    [HttpGet("timezone/{id:int}")]
+    public async Task<ActionResult<APIResponse>> GetTimezone(int id)
+    {
+        try
+        {
+            List<Timezone> timezones = await _countryService.GetTimezonesByCountryId(id);
+            if(timezones == null)
+            {
+                _response.ErrorMessage = new List<string> {"No timezone found"};
+                _response.StatusCode = HttpStatusCode.NoContent;
+                _response.IsSuccess = false;
+                return BadRequest(_response);
+            }
+            _response.StatusCode = HttpStatusCode.OK;
+            _response.IsSuccess = true;
+            _response.Result = timezones;
+            return Ok(_response);
+        }
+        catch (System.Exception ex)
+        {
+            _response.IsSuccess = false;
+            _response.StatusCode = HttpStatusCode.InternalServerError;
+            _response.ErrorMessage = new List<string> { ex.Message };
+            return StatusCode((int)HttpStatusCode.InternalServerError, _response);
+        }
+    }
 }

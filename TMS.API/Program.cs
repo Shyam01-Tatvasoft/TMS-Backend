@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using TMS.Repository.Data;
 using TMS.Repository.Implementations;
 using TMS.Repository.Interfaces;
+using TMS.Service;
 using TMS.Service.Implementations;
 using TMS.Service.Interfaces;
 
@@ -25,13 +26,19 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddDbContext<TmsContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("TMSDbConnection")));
 
+// builder.Services.AddAutoMapper(typeof(MappingConfig).Assembly);
+
 builder.Services.AddControllers();
+
 
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IJWTService, JWTService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ICountryService, CountryService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ICountryRepository, CountryRepository>();
+builder.Services.AddScoped<ITimezoneRepository, TimezoneRepository>();
 
     builder.Services.AddAuthentication(options =>
     {

@@ -45,7 +45,7 @@ public class DashboardController : ControllerBase
 
         try
         {
-            User? user = await _userService.GetUserByEmail(email);
+            UserDto? user = await _userService.GetUserByEmail(email);
             _response.Result = user;
         }
         catch (System.Exception ex)
@@ -56,10 +56,6 @@ public class DashboardController : ControllerBase
         }
         _response.IsSuccess = true;
         _response.StatusCode = HttpStatusCode.OK;
-        // _response.Result = "User Data";
         return Ok(_response);
     }
 }
-
-
-// make one controller which fetch the Authtoken from Cookie and If It's valid then send success message for navigate it to dashboard

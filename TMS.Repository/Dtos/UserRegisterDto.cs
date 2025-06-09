@@ -36,5 +36,11 @@ public class UserRegisterDto
     [Required(ErrorMessage = "Country is required")]
     public string? Country { get; set; }
 
+    [Required]
+    public int CountryId { get; set; }
+
+    [Required]
+    public int Timezone { get; set; }
+
     public string? Role { get; set; }
 }

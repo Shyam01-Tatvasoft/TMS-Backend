@@ -23,7 +23,7 @@ public class AuthenticationService:IAuthenticationService
         var existing = await _userRepository.GetByEmailAsync(dto.Email);
         if (existing != null) return "Email already registered.";
 
-        var user = new User
+        User user = new User
         {
             FirstName = dto.FirstName,
             LastName = dto.LastName,
@@ -31,7 +31,10 @@ public class AuthenticationService:IAuthenticationService
             Password = HashPassword(dto.Password),
             Phone = dto.Phone,
             Country = dto.Country,
-            Role = "User"
+            Role = "User",
+            CountryId = dto.CountryId,
+            CountryTimezone = dto.Timezone,
+            IsDeleted = false
         };
 
         await _userRepository.AddAsync(user);

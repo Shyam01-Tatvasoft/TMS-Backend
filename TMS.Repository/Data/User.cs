@@ -20,4 +20,14 @@ public partial class User
     public string? Country { get; set; }
 
     public string? Role { get; set; }
+
+    public int? CountryId { get; set; }
+
+    public int? CountryTimezone { get; set; }
+
+    public bool? IsDeleted { get; set; }
+
+    public virtual Country? CountryNavigation { get; set; }
+
+    public virtual Timezone? CountryTimezoneNavigation { get; set; }
 }
