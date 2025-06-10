@@ -9,9 +9,13 @@ public partial class Timezone
 
     public string TimezoneName { get; set; } = null!;
 
-    public int? CountryId { get; set; }
+    public int? FkCountryId { get; set; }
 
-    public virtual Country? Country { get; set; }
+    public string? ZoneName { get; set; }
+
+    public string? GmtOffsetName { get; set; }
+
+    public virtual Country? FkCountry { get; set; }
 
     public virtual ICollection<User> Users { get; set; } = new List<User>();
 }

@@ -15,7 +15,7 @@ public class TimezoneRepository:ITimezoneRepository
 
     public async Task<List<Timezone>> GetTimezonesByCountryId(int id)
     {
-        List<Timezone> timezones = await _context.Timezones.Where(t => t.CountryId == id).ToListAsync();
+        List<Timezone> timezones = await _context.Timezones.Where(t => t.FkCountryId == id).ToListAsync();
         return timezones;
     }
 }

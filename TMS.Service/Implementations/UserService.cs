@@ -32,13 +32,13 @@ public class UserService : IUserService
         {
             Id = user.Id,
             Email = user.Email,
+            Username = user.Username,
             FirstName = user.FirstName,
             LastName = user.LastName,
-            Country = user.Country,
-            CountryId = user.CountryId,
-            CountryTimezone = user.CountryTimezone,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
             Phone = user.Phone,
-            Role = user.Role
+            Role = user.FkRoleId == 1 ? "Admin" : "User"
         };
         return userData;
         // return _mapper.Map<UserDto>(user);
@@ -53,14 +53,13 @@ public class UserService : IUserService
         {
             Id = user.Id,
             Email = user.Email,
+            Username = user.Username,
             FirstName = user.FirstName,
             LastName = user.LastName,
-            Country = user.Country,
-            CountryId = user.CountryId,
-            CountryTimezone = user.CountryTimezone,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
             Phone = user.Phone,
-            Role = user.Role,
-            IsDeleted = user.IsDeleted
+            Role = user.FkRoleId == 1 ? "Admin" : "User"
         };
         return userData;
     }
@@ -68,15 +67,15 @@ public class UserService : IUserService
     public async Task<(bool success, string message)> AddUser(UserDto user)
     {
         User newUser = new User{
-            Email = user.Email,
             FirstName = user.FirstName.Trim(),
+            Username = user.Username.Trim(),
             LastName = user.LastName.Trim(),
-            Country = user.Country,
-            CountryId = user.CountryId,
-            CountryTimezone = user.CountryTimezone,
-            Phone = user.Phone.Trim(),
-            Role = "User",
-            Password = HashPassword(user.Password),
+            Email = user.Email,
+            Phone = user.Phone,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
+            FkRoleId = 2,
+            Password = "12345678",
             IsDeleted = false
         };
         User response = await _userRepository.AddAsync(newUser);
@@ -102,11 +101,11 @@ public class UserService : IUserService
             Email = user.Email,
             FirstName = user.FirstName,
             LastName = user.LastName,
-            Country = user.Country,
-            CountryId = user.CountryId,
-            CountryTimezone = user.CountryTimezone,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
             Phone = user.Phone,
-            Role = user.Role,
+            Role = user.FkRoleId == 1 ? "Admin" : "User",
+            Password = user.Password,
             IsDeleted = true
         };
         bool response = await _userRepository.UpdateAsync(userData);

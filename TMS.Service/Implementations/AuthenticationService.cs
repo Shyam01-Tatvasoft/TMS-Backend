@@ -1,6 +1,10 @@
+using System.Collections;
+using System.Net;
+using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
 using AutoMapper;
+using Microsoft.AspNetCore.DataProtection;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Repository.Interfaces;
@@ -8,37 +12,67 @@ using TMS.Service.Interfaces;
 
 namespace TMS.Service.Implementations;
 
-public class AuthenticationService:IAuthenticationService
+public class AuthenticationService : IAuthenticationService
 {
-     private readonly IUserRepository _userRepository;
+    private readonly IUserRepository _userRepository;
     //  private readonly IMapper _mapper;
-
-    public AuthenticationService(IUserRepository userRepository)
+    private readonly IDataProtector _dataProtector;
+    public AuthenticationService(IUserRepository userRepository, IDataProtectionProvider dataProtectionProvider)
     {
         _userRepository = userRepository;
+        _dataProtector = dataProtectionProvider.CreateProtector("ResetPasswordProtector");
+
     }
 
     public async Task<string> RegisterAsync(UserRegisterDto dto)
     {
         var existing = await _userRepository.GetByEmailAsync(dto.Email);
         if (existing != null) return "Email already registered.";
+        var existingUsername = await _userRepository.GetByUsernameAsync(dto.Username);
+        if (existingUsername != null) return "Username already exist.";
 
         User user = new User
         {
-            FirstName = dto.FirstName,
-            LastName = dto.LastName,
+            FirstName = dto.FirstName.Trim(),
+            LastName = dto.LastName.Trim(),
+            Username = dto.Username.Trim(),
             Email = dto.Email,
-            Password = HashPassword(dto.Password),
             Phone = dto.Phone,
-            Country = dto.Country,
-            Role = "User",
-            CountryId = dto.CountryId,
-            CountryTimezone = dto.Timezone,
+            FkCountryId = dto.CountryId,
+            FkCountryTimezone = dto.Timezone,
+            FkRoleId = 2,
+            Password = "12345678",
             IsDeleted = false
         };
 
         await _userRepository.AddAsync(user);
+        string resetToken = GenerateResetToken(dto.Email);
+        var resetLink = "http://127.0.0.1:5500/assets/templates/SetupPassword.html?token=" + resetToken;
+        string subject = "Password setup request";
+        string body = GetEmailTemplate(resetLink);
+        SendMail(dto.Email, subject, body);
         return "Registration successful.";
+    }
+
+    public async Task<bool> ResetPasswordAsync(string email,ResetPasswordDto dto)
+    {
+        User? user = await _userRepository.GetByEmailAsync(email);
+        user.Password = HashPassword(dto.NewPassword);
+        UserDto userData = new()
+        {
+            Id = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
+            Password = user.Password,
+            Phone = user.Phone,
+            Role = user.FkRoleId == 1 ? "Admin" : "User",
+            IsDeleted = false
+        };
+        bool response = await _userRepository.UpdateAsync(userData);
+        return response;
     }
 
     public async Task<User?> LoginAsync(UserLoginDto dto)
@@ -59,5 +93,87 @@ public class AuthenticationService:IAuthenticationService
     private static bool VerifyPassword(string password, string? storedHash)
     {
         return HashPassword(password) == storedHash;
+    }
+
+    private static string GetEmailTemplate(string ResetLink)
+    {
+        var templatePath = "d:/TMS/TMS.Service/Templates/EmailTemplate.html";
+        if (!System.IO.File.Exists(templatePath))
+        {
+            return "<p>Email template Not Fount</p>";
+        }
+        string emailbody = System.IO.File.ReadAllText(templatePath);
+        return emailbody.Replace("{{Link}}", ResetLink);
+    }
+
+    private void SendMail(string ToEmail, string subject, string body)
+    {
+        string SenderMail = "test.dotnet@etatvasoft.com";
+        string SenderPassword = "P}N^{z-]7Ilp";
+        string Host = "mail.etatvasoft.com";
+        int Port = 587;
+
+        var smtpClient = new SmtpClient(Host)
+        {
+            Port = Port,
+            Credentials = new NetworkCredential(SenderMail, SenderPassword),
+        };
+
+        MailMessage mailMessage = new MailMessage();
+        mailMessage.From = new MailAddress(SenderMail);
+        mailMessage.To.Add(ToEmail);
+        mailMessage.Subject = subject;
+        mailMessage.IsBodyHtml = true;
+        // StringBuilder mailBody = new StringBuilder();
+        mailMessage.Body = body;
+
+        smtpClient.Send(mailMessage);
+    }
+
+    public string GenerateResetToken(string email)
+    {
+        DateTime expiry = DateTime.UtcNow.AddHours(24);
+        string tokenData = $"{email} | {expiry.Ticks}";
+        return _dataProtector.Protect(tokenData);
+    }
+
+    public async Task<string?> ValidateResetToken(string token)
+    {
+        string unprotectedToken;
+        try
+        {
+            unprotectedToken = _dataProtector.Unprotect(token);
+        }
+        catch
+        {
+            return null;
+        }
+
+        // Token format: {email}|{expiryTicks}
+        var parts = unprotectedToken.Split('|');
+        if (parts.Length != 2 || !long.TryParse(parts[1], out long expiryTicks))
+            return null;
+
+        DateTime expiryDate = new DateTime(expiryTicks, DateTimeKind.Utc);
+        if (expiryDate < DateTime.UtcNow)
+        {
+            return null;
+        }
+
+        string email = parts[0].Trim();
+
+        User user = await _userRepository.GetByEmailAsync(email);
+        if (user == null)
+        {
+            return null;
+        }
+
+        // check for validation
+        if (user.Password != "12345678")
+        {
+            return null;
+        }
+
+        return email;
     }
 }

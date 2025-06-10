@@ -1,3 +1,4 @@
+using System.Collections;
 using Microsoft.EntityFrameworkCore;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
@@ -17,9 +18,15 @@ public class UserRepository:IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email)
     {
+        
         return await _context.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsDeleted == false);
     }
 
+    public async Task<User?> GetByUsernameAsync(string username)
+    {
+        
+        return await _context.Users.FirstOrDefaultAsync(u => u.Username == username && u.IsDeleted == false);
+    }
     public async Task<User?> GetByIdAsync(int id)
     {
         return await _context.Users.FirstOrDefaultAsync(u => u.Id == id && u.IsDeleted == false);
@@ -43,11 +50,10 @@ public class UserRepository:IUserRepository
         existingUser.FirstName = user.FirstName;
         existingUser.LastName = user.LastName; 
         existingUser.Phone = user.Phone; 
-        existingUser.Country = user.Country;
-        existingUser.CountryId = user.CountryId;
-        existingUser.CountryTimezone = user.CountryTimezone;
-        existingUser.IsDeleted = user.IsDeleted;
-
+        existingUser.FkCountryId = user.FkCountryId;
+        existingUser.FkCountryTimezone = user.FkCountryTimezone;
+        existingUser.IsDeleted = (bool)user.IsDeleted!;
+        existingUser.Password = user.Password;
         await _context.SaveChangesAsync();
         return true;
     }

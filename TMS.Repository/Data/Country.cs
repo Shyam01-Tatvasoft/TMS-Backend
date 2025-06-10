@@ -9,7 +9,11 @@ public partial class Country
 
     public string CountryName { get; set; } = null!;
 
-    public string CountryCode { get; set; } = null!;
+    public string IsoCode { get; set; } = null!;
+
+    public string? Flag { get; set; }
+
+    public string? PhoneCode { get; set; }
 
     public virtual ICollection<Timezone> Timezones { get; set; } = new List<Timezone>();
 

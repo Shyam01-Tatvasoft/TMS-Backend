@@ -6,6 +6,7 @@ namespace TMS.Repository.Interfaces;
 public interface IUserRepository
 {
     public Task<User?> GetByEmailAsync(string email);
+    public Task<User?> GetByUsernameAsync(string username);
     public Task<User> AddAsync(User user);
     public Task<List<User>> GetUsers();
     public Task<bool> UpdateAsync(UserDto user);

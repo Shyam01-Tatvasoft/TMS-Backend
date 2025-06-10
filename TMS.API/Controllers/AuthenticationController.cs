@@ -74,12 +74,19 @@ public class AuthenticationController : ControllerBase
         var result = await _autService.RegisterAsync(dto);
         if (result == "Email already registered.")
         {
-            ModelState.AddModelError("CustomeError", "Villa Already Exist!");
             _response.IsSuccess = false;
-            _response.ErrorMessage.Add("User Already Exist");
+            _response.ErrorMessage = new List<string> { result }; ;
             return BadRequest(_response);
         }
+        else if (result == "Username already exist.")
+        {
+            _response.IsSuccess = false;
+            _response.ErrorMessage = new List<string> { result };
+            return BadRequest(_response);
+        }
+        _response.StatusCode = HttpStatusCode.OK;
         _response.IsSuccess = true;
+        _response.Result = "Registered Successfully";
         return Ok(_response);
     }
 
@@ -120,9 +127,9 @@ public class AuthenticationController : ControllerBase
         try
         {
             List<Timezone> timezones = await _countryService.GetTimezonesByCountryId(id);
-            if(timezones == null)
+            if (timezones == null)
             {
-                _response.ErrorMessage = new List<string> {"No timezone found"};
+                _response.ErrorMessage = new List<string> { "No timezone found" };
                 _response.StatusCode = HttpStatusCode.NoContent;
                 _response.IsSuccess = false;
                 return BadRequest(_response);
@@ -140,4 +147,66 @@ public class AuthenticationController : ControllerBase
             return StatusCode((int)HttpStatusCode.InternalServerError, _response);
         }
     }
+
+
+    [HttpGet("reset-password")]
+    public async Task<ActionResult<APIResponse>> ResetPassword(string token)
+    {
+        string? email = await _autService.ValidateResetToken(token);
+        if (string.IsNullOrEmpty(token))
+        {
+            _response.ErrorMessage = new List<String> { "Invalid token" };
+            _response.IsSuccess = false;
+            _response.StatusCode = HttpStatusCode.BadRequest;
+            return BadRequest(_response);
+        }
+        if (string.IsNullOrEmpty(email))
+        {
+             _response.ErrorMessage = new List<String> { "Invalid token" };
+            _response.IsSuccess = false;
+            _response.StatusCode = HttpStatusCode.BadRequest;
+            return BadRequest(_response);
+        }
+        _response.StatusCode = HttpStatusCode.OK;
+        _response.IsSuccess = true;
+        _response.Result = "Token is valid";
+        return Ok(_response);
+    }
+
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<APIResponse>> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            _response.IsSuccess = false;
+            _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+            return BadRequest(_response);
+        }
+
+        var email = await _autService.ValidateResetToken(dto.Token);
+        if (string.IsNullOrEmpty(email))
+        {
+            _response.IsSuccess = false;
+            _response.ErrorMessage = new List<string> { "Your token is expired" };
+            return BadRequest(_response);
+        }
+
+        var result = await _autService.ResetPasswordAsync(email, dto);
+        if (!result)
+        {
+            _response.StatusCode = HttpStatusCode.BadRequest;
+            _response.IsSuccess = false;
+            _response.ErrorMessage = new List<string> { "Failed to reset password" };
+            return BadRequest(_response);
+        }
+
+        _response.StatusCode = HttpStatusCode.OK;
+        _response.Result = "Password reset successfully";
+        return Ok(_response);
+    }
+
 }

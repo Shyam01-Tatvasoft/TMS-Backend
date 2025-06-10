@@ -31,7 +31,8 @@ public class JWTService:IJWTService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_key));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         User? user = await _userRepository.GetByEmailAsync(email);
-        string userRole = user?.Role;
+        string? userRole = user?.FkRoleId == 1 ? "Admin" : "User";
+        
         var authClaims = new List<Claim>{
             new Claim(ClaimTypes.Email, email),
             new Claim(ClaimTypes.Role, userRole),

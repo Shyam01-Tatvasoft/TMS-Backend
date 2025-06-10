@@ -17,17 +17,19 @@ public partial class User
 
     public string? Phone { get; set; }
 
-    public string? Country { get; set; }
+    public int? FkCountryId { get; set; }
 
-    public string? Role { get; set; }
+    public int? FkCountryTimezone { get; set; }
 
-    public int? CountryId { get; set; }
+    public int? FkRoleId { get; set; }
 
-    public int? CountryTimezone { get; set; }
+    public string Username { get; set; } = null!;
 
     public bool? IsDeleted { get; set; }
 
-    public virtual Country? CountryNavigation { get; set; }
+    public virtual Country? FkCountry { get; set; }
 
-    public virtual Timezone? CountryTimezoneNavigation { get; set; }
+    public virtual Timezone? FkCountryTimezoneNavigation { get; set; }
+
+    public virtual Role? FkRole { get; set; }
 }
