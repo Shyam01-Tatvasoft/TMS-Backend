@@ -81,7 +81,7 @@ public class AuthenticationController : ControllerBase
         else if (result == "Username already exist.")
         {
             _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { result };
+            _response.ErrorMessage = new List<string> { "Username is not available." };
             return BadRequest(_response);
         }
         _response.StatusCode = HttpStatusCode.OK;
@@ -102,57 +102,11 @@ public class AuthenticationController : ControllerBase
         return Ok(_response);
     }
 
-    [HttpGet("countries")]
-    public async Task<ActionResult<APIResponse>> GetCountries()
-    {
-        try
-        {
-            _response.StatusCode = HttpStatusCode.OK;
-            _response.IsSuccess = true;
-            _response.Result = await _countryService.GetCountries();
-            return Ok(_response);
-        }
-        catch (System.Exception ex)
-        {
-            _response.IsSuccess = false;
-            _response.StatusCode = HttpStatusCode.InternalServerError;
-            _response.ErrorMessage = new List<string> { ex.Message };
-            return StatusCode((int)HttpStatusCode.InternalServerError, _response);
-        }
-    }
-
-    [HttpGet("timezone/{id:int}")]
-    public async Task<ActionResult<APIResponse>> GetTimezone(int id)
-    {
-        try
-        {
-            List<Timezone> timezones = await _countryService.GetTimezonesByCountryId(id);
-            if (timezones == null)
-            {
-                _response.ErrorMessage = new List<string> { "No timezone found" };
-                _response.StatusCode = HttpStatusCode.NoContent;
-                _response.IsSuccess = false;
-                return BadRequest(_response);
-            }
-            _response.StatusCode = HttpStatusCode.OK;
-            _response.IsSuccess = true;
-            _response.Result = timezones;
-            return Ok(_response);
-        }
-        catch (System.Exception ex)
-        {
-            _response.IsSuccess = false;
-            _response.StatusCode = HttpStatusCode.InternalServerError;
-            _response.ErrorMessage = new List<string> { ex.Message };
-            return StatusCode((int)HttpStatusCode.InternalServerError, _response);
-        }
-    }
-
 
     [HttpGet("reset-password")]
-    public async Task<ActionResult<APIResponse>> ResetPassword(string token)
+    public async Task<ActionResult<APIResponse>> ResetPassword(string token,string type)
     {
-        string? email = await _autService.ValidateResetToken(token);
+        string? email = await _autService.ValidateResetToken(token,type);
         if (string.IsNullOrEmpty(token))
         {
             _response.ErrorMessage = new List<String> { "Invalid token" };
@@ -187,7 +141,7 @@ public class AuthenticationController : ControllerBase
             return BadRequest(_response);
         }
 
-        var email = await _autService.ValidateResetToken(dto.Token);
+        var email = await _autService.ValidateResetToken(dto.Token,dto.Type);
         if (string.IsNullOrEmpty(email))
         {
             _response.IsSuccess = false;
@@ -208,5 +162,33 @@ public class AuthenticationController : ControllerBase
         _response.Result = "Password reset successfully";
         return Ok(_response);
     }
+
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<APIResponse>> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            _response.IsSuccess = false;
+            _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+            return BadRequest(_response);
+        }
+
+        var result = await _autService.ForgotPassword(dto.Email);
+        if (result == "User not Exist.")
+        {
+            _response.IsSuccess = false;
+            _response.ErrorMessage = new List<string> { result };
+            return BadRequest(_response);
+        }
+
+        _response.StatusCode = HttpStatusCode.OK;
+        _response.IsSuccess = true;
+        _response.Result = "Mail sent successfully";
+        return Ok(_response);
+    }
+
 
 }

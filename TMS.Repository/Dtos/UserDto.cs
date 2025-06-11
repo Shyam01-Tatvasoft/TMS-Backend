@@ -16,6 +16,10 @@ public class UserDto
 
     public string? Phone { get; set; }
 
+    public string? CountryName {get; set; }
+
+    public string? TimezoneName { get; set; }
+    
     public int? FkCountryId { get; set; }
 
     public int? FkCountryTimezone { get; set; }
@@ -25,4 +29,6 @@ public class UserDto
     public bool? IsDeleted { get; set; }
 
     public string Username { get; set; } = null!;
+
+    public DateTime? ModifiedAt { get; set; }
 }

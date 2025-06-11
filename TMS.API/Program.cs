@@ -39,6 +39,7 @@ builder.Services.AddScoped<ICountryService, CountryService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ICountryRepository, CountryRepository>();
 builder.Services.AddScoped<ITimezoneRepository, TimezoneRepository>();
+builder.Services.AddHttpClient<CountryRepository>();
 
     builder.Services.AddAuthentication(options =>
     {

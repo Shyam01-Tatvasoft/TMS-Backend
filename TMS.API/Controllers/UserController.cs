@@ -31,7 +31,7 @@ public class UserController : ControllerBase
     {
         try
         {
-            List<User> userList = await _userService.GetUsers();
+            List<UserDto> userList = await _userService.GetUsers();
             _response.Result =  new { data = userList };
             _response.StatusCode = HttpStatusCode.OK;
             return Ok(_response);
@@ -44,6 +44,7 @@ public class UserController : ControllerBase
         }
     }
 
+    [ApiExplorerSettings(IgnoreApi = true)]
     [HttpGet("GetUser")]
     public async Task<ActionResult<APIResponse>> GetUser()
     {
@@ -83,7 +84,7 @@ public class UserController : ControllerBase
     {
         try
         {
-            var user = await _userService.GetUserById(id);
+            UserDto user = await _userService.GetUserById(id);
             if (user == null)
             {
                 _response.StatusCode = HttpStatusCode.NotFound;
@@ -105,12 +106,12 @@ public class UserController : ControllerBase
     }
 
     [HttpPost("AddUser")]
-    public async Task<ActionResult<APIResponse>> AddUser([FromBody] UserDto userDto)
+    public async Task<ActionResult<APIResponse>> AddUser([FromBody] AddEditUserDto userDto)
     {
-        if (userDto == null)
+        if (!ModelState.IsValid)
         {
-            _response.StatusCode = HttpStatusCode.BadRequest;
-            _response.ErrorMessage = new List<string> { "User data is required." };
+            _response.IsSuccess = false;
+            _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
             return BadRequest(_response);
         }
 
@@ -121,7 +122,7 @@ public class UserController : ControllerBase
             _response.IsSuccess = success;
             _response.ErrorMessage = success ? null : new List<string> { message };
             _response.Result = success ? message : null;
-            return StatusCode((int)_response.StatusCode, _response);
+            return Ok(_response);
         }
         catch (System.Exception ex)
         {
@@ -133,12 +134,19 @@ public class UserController : ControllerBase
 
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<APIResponse>> UpdateUser(int id, [FromBody] UserDto userDto)
+    public async Task<ActionResult<APIResponse>> UpdateUser(int id, [FromBody] AddEditUserDto userDto)
     {
         if (id != userDto.Id)
         {
             _response.StatusCode = HttpStatusCode.BadRequest;
             _response.ErrorMessage = new List<string> { "User ID mismatch." };
+            return BadRequest(_response);
+        }
+
+        if (!ModelState.IsValid)
+        {
+            _response.IsSuccess = false;
+            _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
             return BadRequest(_response);
         }
 

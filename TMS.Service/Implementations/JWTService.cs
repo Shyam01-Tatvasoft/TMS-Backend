@@ -38,7 +38,7 @@ public class JWTService:IJWTService
             new Claim(ClaimTypes.Role, userRole),
             new Claim(ClaimTypes.NameIdentifier,user.Id.ToString())
          };
-        DateTime expiry = rememberMe ? DateTime.UtcNow.AddHours(24) : DateTime.UtcNow.AddMinutes(30);
+        DateTime expiry = rememberMe ? DateTime.UtcNow.AddHours(24) : DateTime.UtcNow.AddHours(3);
         var token = new JwtSecurityToken(
             issuer: _issuer,
             audience: _audience,

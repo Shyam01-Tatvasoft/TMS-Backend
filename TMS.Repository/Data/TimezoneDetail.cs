@@ -3,17 +3,17 @@ using System.Collections.Generic;
 
 namespace TMS.Repository.Data;
 
-public partial class Timezone
+public partial class TimezoneDetail
 {
     public int Id { get; set; }
 
-    public string TimezoneName { get; set; } = null!;
+    public string Timezone { get; set; } = null!;
 
     public int? FkCountryId { get; set; }
 
-    public string? ZoneName { get; set; }
+    public string? Zone { get; set; }
 
-    public string? GmtOffsetName { get; set; }
+    public string? Offset { get; set; }
 
     public virtual Country? FkCountry { get; set; }
 

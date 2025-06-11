@@ -15,4 +15,7 @@ public class ResetPasswordDto
     [Required(ErrorMessage = "Confirm New Password is required.")]
     [Compare("NewPassword", ErrorMessage = "Password doesn't match")]
     public string ConfirmNewPassword { get; set; } = null!;
+
+    [Required(ErrorMessage = "Type is required.")]
+    public string Type { get; set; } = null!;
 }

@@ -18,10 +18,29 @@ public class UserService : IUserService
         // _mapper = mapper;
     }
 
-    public async Task<List<User>> GetUsers()
+    public async Task<List<UserDto>> GetUsers()
     {
         List<User> users = await _userRepository.GetUsers();
-        return users;
+        List<UserDto> userDtos = new List<UserDto>();
+        users.ForEach(user =>
+        {
+            UserDto userData = new UserDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Username = user.Username,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                FkCountryId = user.FkCountryId,
+                FkCountryTimezone = user.FkCountryTimezone,
+                Phone = user.Phone,
+                Role = user.FkRole.Name,
+                CountryName = user.FkCountry?.Name,
+                TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
+            };
+            userDtos.Add(userData);
+        });
+        return userDtos;
         // return _mapper.Map<List<UserDto>>(users);
     }
 
@@ -38,7 +57,9 @@ public class UserService : IUserService
             FkCountryId = user.FkCountryId,
             FkCountryTimezone = user.FkCountryTimezone,
             Phone = user.Phone,
-            Role = user.FkRoleId == 1 ? "Admin" : "User"
+            Role = user.FkRole.Name,
+            CountryName = user.FkCountry?.Name,
+            TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
         };
         return userData;
         // return _mapper.Map<UserDto>(user);
@@ -59,14 +80,23 @@ public class UserService : IUserService
             FkCountryId = user.FkCountryId,
             FkCountryTimezone = user.FkCountryTimezone,
             Phone = user.Phone,
-            Role = user.FkRoleId == 1 ? "Admin" : "User"
+            Role = user.FkRole.Name,
+            CountryName = user.FkCountry?.Name,
+            TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
         };
         return userData;
     }
-    
-    public async Task<(bool success, string message)> AddUser(UserDto user)
+
+    public async Task<(bool success, string message)> AddUser(AddEditUserDto user)
     {
-        User newUser = new User{
+        var existing = await _userRepository.GetByEmailAsync(user.Email);
+        if (existing != null) return (false,"Email already registered.");
+        User? existingUser = await _userRepository.GetByUsernameAsync(user.Username);
+        if (existingUser != null)
+            return (false, "Username already exists.");
+
+        User newUser = new User
+        {
             FirstName = user.FirstName.Trim(),
             Username = user.Username.Trim(),
             LastName = user.LastName.Trim(),
@@ -82,8 +112,18 @@ public class UserService : IUserService
         return response != null ? (true, "User added successfully.") : (false, "Error while add new user.");
     }
 
-    public async Task<(bool success, string message)> UpdateUser(UserDto user)
+    public async Task<(bool success, string message)> UpdateUser(AddEditUserDto user)
     {
+        User? existingUser = await _userRepository.GetByUsernameAsync(user.Username);
+        if (existingUser != null && existingUser.Id != user.Id)
+        {
+            return (false, "Username not available.");
+        }
+        User existingUserByEmail = await _userRepository.GetByEmailAsync(user.Email);
+
+        user.Password = existingUserByEmail?.Password;
+        user.ModifiedAt = DateTime.Now;
+        user.IsDeleted = false;
         bool response = await _userRepository.UpdateAsync(user);
 
         return response ? (true, "User updated successfully.") : (false, "User Not Found.");
@@ -93,9 +133,9 @@ public class UserService : IUserService
     public async Task<(bool success, string message)> DeleteUser(int id)
     {
         User? user = await _userRepository.GetByIdAsync(id);
-        if(user == null)
+        if (user == null)
             return (false, "User Not Found.");
-        UserDto userData = new UserDto
+        AddEditUserDto userData = new()
         {
             Id = user.Id,
             Email = user.Email,
@@ -104,26 +144,14 @@ public class UserService : IUserService
             FkCountryId = user.FkCountryId,
             FkCountryTimezone = user.FkCountryTimezone,
             Phone = user.Phone,
-            Role = user.FkRoleId == 1 ? "Admin" : "User",
             Password = user.Password,
-            IsDeleted = true
+            Username = user.Username,
+            IsDeleted = true,
+            ModifiedAt = user.ModifiedAt
         };
         bool response = await _userRepository.UpdateAsync(userData);
 
         return response ? (true, "User deleted successfully.") : (false, "User Not Found.");
     }
 
-
-     private static string HashPassword(string password)
-    {
-        using var sha = SHA256.Create();
-        var bytes = Encoding.UTF8.GetBytes(password);
-        var hash = sha.ComputeHash(bytes);
-        return Convert.ToBase64String(hash);
-    }
-
-    private static bool VerifyPassword(string password, string? storedHash)
-    {
-        return HashPassword(password) == storedHash;
-    }
 }

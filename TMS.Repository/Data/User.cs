@@ -27,9 +27,11 @@ public partial class User
 
     public bool? IsDeleted { get; set; }
 
+    public DateTime? ModifiedAt { get; set; }
+
     public virtual Country? FkCountry { get; set; }
 
-    public virtual Timezone? FkCountryTimezoneNavigation { get; set; }
+    public virtual TimezoneDetail? FkCountryTimezoneNavigation { get; set; }
 
     public virtual Role? FkRole { get; set; }
 }

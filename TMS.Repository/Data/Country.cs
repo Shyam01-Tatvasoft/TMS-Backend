@@ -7,7 +7,7 @@ public partial class Country
 {
     public int Id { get; set; }
 
-    public string CountryName { get; set; } = null!;
+    public string Name { get; set; } = null!;
 
     public string IsoCode { get; set; } = null!;
 
@@ -15,7 +15,7 @@ public partial class Country
 
     public string? PhoneCode { get; set; }
 
-    public virtual ICollection<Timezone> Timezones { get; set; } = new List<Timezone>();
+    public virtual ICollection<TimezoneDetail> TimezoneDetails { get; set; } = new List<TimezoneDetail>();
 
     public virtual ICollection<User> Users { get; set; } = new List<User>();
 }

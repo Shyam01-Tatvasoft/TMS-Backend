@@ -21,9 +21,15 @@ public class CountryService : ICountryService
         return countries;
     }
 
-    public async Task<List<Timezone>> GetTimezonesByCountryId(int id)
+    public async Task<List<TimezoneDetail>> GetTimezonesByCountryId(int id)
     {
-        List<Timezone> timezones = await _timezoneRepository.GetTimezonesByCountryId(id);
+        List<TimezoneDetail> timezones = await _timezoneRepository.GetTimezonesByCountryId(id);
         return timezones;
+    }
+
+    public async Task<string> ImportCountriesAsync()
+    {
+        string result = await _countryRepository.ImportCountriesAsync();
+        return result;
     }
 }

@@ -19,7 +19,7 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<Role> Roles { get; set; }
 
-    public virtual DbSet<Timezone> Timezones { get; set; }
+    public virtual DbSet<TimezoneDetail> TimezoneDetails { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
 
@@ -36,17 +36,17 @@ public partial class TmsContext : DbContext
             entity.ToTable("country");
 
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.CountryName)
-                .HasMaxLength(100)
-                .HasColumnName("country_name");
             entity.Property(e => e.Flag)
-                .HasMaxLength(10)
+                .HasMaxLength(100)
                 .HasColumnName("flag");
             entity.Property(e => e.IsoCode)
-                .HasMaxLength(10)
+                .HasMaxLength(100)
                 .HasColumnName("iso_code");
+            entity.Property(e => e.Name)
+                .HasMaxLength(100)
+                .HasColumnName("name");
             entity.Property(e => e.PhoneCode)
-                .HasMaxLength(10)
+                .HasMaxLength(100)
                 .HasColumnName("phone_code");
         });
 
@@ -62,25 +62,27 @@ public partial class TmsContext : DbContext
                 .HasColumnName("name");
         });
 
-        modelBuilder.Entity<Timezone>(entity =>
+        modelBuilder.Entity<TimezoneDetail>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("timezone_pkey");
 
-            entity.ToTable("timezone");
+            entity.ToTable("timezone_detail");
 
-            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('timezone_id_seq'::regclass)")
+                .HasColumnName("id");
             entity.Property(e => e.FkCountryId).HasColumnName("fk_country_id");
-            entity.Property(e => e.GmtOffsetName)
+            entity.Property(e => e.Offset)
                 .HasMaxLength(100)
-                .HasColumnName("gmt_offset_name");
-            entity.Property(e => e.TimezoneName)
+                .HasColumnName("offset");
+            entity.Property(e => e.Timezone)
                 .HasMaxLength(100)
-                .HasColumnName("timezone_name");
-            entity.Property(e => e.ZoneName)
+                .HasColumnName("timezone");
+            entity.Property(e => e.Zone)
                 .HasMaxLength(100)
-                .HasColumnName("zone_name");
+                .HasColumnName("zone");
 
-            entity.HasOne(d => d.FkCountry).WithMany(p => p.Timezones)
+            entity.HasOne(d => d.FkCountry).WithMany(p => p.TimezoneDetails)
                 .HasForeignKey(d => d.FkCountryId)
                 .HasConstraintName("timezone_country_id_fkey");
         });
@@ -109,6 +111,9 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.LastName)
                 .HasMaxLength(100)
                 .HasColumnName("last_name");
+            entity.Property(e => e.ModifiedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("modified_at");
             entity.Property(e => e.Password)
                 .HasMaxLength(200)
                 .HasColumnName("password");

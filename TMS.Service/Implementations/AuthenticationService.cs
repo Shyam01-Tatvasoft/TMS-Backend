@@ -49,16 +49,29 @@ public class AuthenticationService : IAuthenticationService
         string resetToken = GenerateResetToken(dto.Email);
         var resetLink = "http://127.0.0.1:5500/assets/templates/SetupPassword.html?token=" + resetToken;
         string subject = "Password setup request";
-        string body = GetEmailTemplate(resetLink);
+        string body = GetEmailTemplate(resetLink, "SetupPasswordTemplate");
         SendMail(dto.Email, subject, body);
-        return "Registration successful.";
+        return "Account created successfully.";
     }
 
-    public async Task<bool> ResetPasswordAsync(string email,ResetPasswordDto dto)
+    public async Task<string> ForgotPassword(string email)
+    {
+        var existing = await _userRepository.GetByEmailAsync(email);
+        if (existing == null) return "User not Exist.";
+
+        string resetToken = GenerateResetToken(email);
+        var resetLink = "http://127.0.0.1:5500/assets/templates/ResetPassword.html?token=" + resetToken;
+        string subject = "Password reset request";
+        string body = GetEmailTemplate(resetLink, "ForgotPasswordTemplate");
+        SendMail(email, subject, body);
+        return "Mail sent successfully.";
+    }
+
+    public async Task<bool> ResetPasswordAsync(string email, ResetPasswordDto dto)
     {
         User? user = await _userRepository.GetByEmailAsync(email);
         user.Password = HashPassword(dto.NewPassword);
-        UserDto userData = new()
+        AddEditUserDto userData = new()
         {
             Id = user.Id,
             Email = user.Email,
@@ -68,18 +81,33 @@ public class AuthenticationService : IAuthenticationService
             FkCountryTimezone = user.FkCountryTimezone,
             Password = user.Password,
             Phone = user.Phone,
-            Role = user.FkRoleId == 1 ? "Admin" : "User",
-            IsDeleted = false
+            IsDeleted = false,
+            ModifiedAt = DateTime.Now,
+            Username = user.Username
         };
         bool response = await _userRepository.UpdateAsync(userData);
         return response;
     }
 
-    public async Task<User?> LoginAsync(UserLoginDto dto)
+    public async Task<UserDto?> LoginAsync(UserLoginDto dto)
     {
         var user = await _userRepository.GetByEmailAsync(dto.Email);
         if (user == null || !VerifyPassword(dto.Password, user.Password)) return null;
-        return user;
+        UserDto userData = new()
+        {
+            Id = user.Id,
+            Email = user.Email,
+            Username = user.Username,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
+            Phone = user.Phone,
+            Role = user.FkRole.Name,
+            CountryName = user.FkCountry?.Name,
+            TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
+        };
+        return userData;
     }
 
     private static string HashPassword(string password)
@@ -95,9 +123,17 @@ public class AuthenticationService : IAuthenticationService
         return HashPassword(password) == storedHash;
     }
 
-    private static string GetEmailTemplate(string ResetLink)
+    private static string GetEmailTemplate(string ResetLink, string templateName)
     {
-        var templatePath = "d:/TMS/TMS.Service/Templates/EmailTemplate.html";
+        string templatePath = "";
+        if (templateName == "ForgotPasswordTemplate")
+        {
+            templatePath = "d:/TMS/TMS.Service/Templates/ResetPasswordMailTemplate.html";
+        }
+        else
+        {
+            templatePath = "d:/TMS/TMS.Service/Templates/EmailTemplate.html";
+        }
         if (!System.IO.File.Exists(templatePath))
         {
             return "<p>Email template Not Fount</p>";
@@ -137,7 +173,7 @@ public class AuthenticationService : IAuthenticationService
         return _dataProtector.Protect(tokenData);
     }
 
-    public async Task<string?> ValidateResetToken(string token)
+    public async Task<string?> ValidateResetToken(string token, string validationType)
     {
         string unprotectedToken;
         try
@@ -169,9 +205,22 @@ public class AuthenticationService : IAuthenticationService
         }
 
         // check for validation
-        if (user.Password != "12345678")
+        if (validationType == "ResetPassword")
         {
-            return null;
+            DateTime? updatedDate = user.ModifiedAt;
+            if (updatedDate.HasValue)
+            {
+                DateTime updatedDateUtc = TimeZoneInfo.ConvertTimeToUtc(updatedDate.Value, TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"));
+                if (updatedDateUtc > expiryDate.AddHours(-24))
+                {
+                    return null;
+                }
+            }
+        }
+        else
+        {
+            if (user.Password != "12345678")
+                return null;
         }
 
         return email;
