@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
@@ -106,7 +107,7 @@ public class UserController : ControllerBase
     }
 
     [HttpPost("AddUser")]
-    public async Task<ActionResult<APIResponse>> AddUser([FromBody] AddEditUserDto userDto)
+    public async Task<ActionResult<APIResponse>> AddUser([FromForm] AddEditUserDto userDto)
     {
         if (!ModelState.IsValid)
         {
@@ -134,7 +135,7 @@ public class UserController : ControllerBase
 
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<APIResponse>> UpdateUser(int id, [FromBody] AddEditUserDto userDto)
+    public async Task<ActionResult<APIResponse>> UpdateUser(int id, [FromForm] AddEditUserDto userDto)
     {
         if (id != userDto.Id)
         {

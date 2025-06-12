@@ -30,5 +30,7 @@ public class UserDto
 
     public string Username { get; set; } = null!;
 
+    public string? ProfileImagePath { get; set; }
+
     public DateTime? ModifiedAt { get; set; }
 }

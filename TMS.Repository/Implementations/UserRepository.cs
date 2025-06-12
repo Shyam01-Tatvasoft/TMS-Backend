@@ -71,6 +71,7 @@ public class UserRepository : IUserRepository
         existingUser.Password = user.Password;
         existingUser.Username = user.Username;
         existingUser.ModifiedAt = user.ModifiedAt;
+        existingUser.ProfileImage = user.ProfileImagePath;
         await _context.SaveChangesAsync();
         return true;
     }

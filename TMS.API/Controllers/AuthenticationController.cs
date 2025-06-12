@@ -102,7 +102,7 @@ public class AuthenticationController : ControllerBase
         return Ok(_response);
     }
 
-
+    [ApiExplorerSettings(IgnoreApi = true)]
     [HttpGet("reset-password")]
     public async Task<ActionResult<APIResponse>> ResetPassword(string token,string type)
     {

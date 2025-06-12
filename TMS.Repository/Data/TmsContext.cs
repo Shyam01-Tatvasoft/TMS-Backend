@@ -19,6 +19,12 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<Role> Roles { get; set; }
 
+    public virtual DbSet<SubTask> SubTasks { get; set; }
+
+    public virtual DbSet<Task> Tasks { get; set; }
+
+    public virtual DbSet<TaskAssign> TaskAssigns { get; set; }
+
     public virtual DbSet<TimezoneDetail> TimezoneDetails { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
@@ -60,6 +66,71 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.Name)
                 .HasMaxLength(100)
                 .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<SubTask>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("sub_task_pkey");
+
+            entity.ToTable("sub_task");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.FkTaskId).HasColumnName("fk_task_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(200)
+                .HasColumnName("name");
+
+            entity.HasOne(d => d.FkTask).WithMany(p => p.SubTasks)
+                .HasForeignKey(d => d.FkTaskId)
+                .HasConstraintName("sub_task_fk_task_id_fkey");
+        });
+
+        modelBuilder.Entity<Task>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("task_pkey");
+
+            entity.ToTable("task");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name");
+        });
+
+        modelBuilder.Entity<TaskAssign>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("task_assign_pkey");
+
+            entity.ToTable("task_assign");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at");
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.DueDate).HasColumnName("due_date");
+            entity.Property(e => e.FkSubtaskId).HasColumnName("fk_subtask_id");
+            entity.Property(e => e.FkTaskId).HasColumnName("fk_task_id");
+            entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
+            entity.Property(e => e.Priority)
+                .HasDefaultValueSql("1")
+                .HasColumnName("priority");
+            entity.Property(e => e.Status)
+                .HasDefaultValueSql("1")
+                .HasColumnName("status");
+            entity.Property(e => e.TaskData)
+                .HasColumnType("jsonb")
+                .HasColumnName("task_data");
+
+            entity.HasOne(d => d.FkSubtask).WithMany(p => p.TaskAssigns)
+                .HasForeignKey(d => d.FkSubtaskId)
+                .HasConstraintName("task_assign_fk_subtask_id_fkey");
+
+            entity.HasOne(d => d.FkTask).WithMany(p => p.TaskAssigns)
+                .HasForeignKey(d => d.FkTaskId)
+                .HasConstraintName("task_assign_fk_task_id_fkey");
+
+            entity.HasOne(d => d.FkUser).WithMany(p => p.TaskAssigns)
+                .HasForeignKey(d => d.FkUserId)
+                .HasConstraintName("task_assign_fk_user_id_fkey");
         });
 
         modelBuilder.Entity<TimezoneDetail>(entity =>
@@ -121,6 +192,7 @@ public partial class TmsContext : DbContext
                 .HasMaxLength(20)
                 .IsFixedLength()
                 .HasColumnName("phone");
+            entity.Property(e => e.ProfileImage).HasColumnName("profile_image");
             entity.Property(e => e.Username)
                 .HasMaxLength(50)
                 .HasColumnName("username");

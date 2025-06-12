@@ -37,6 +37,7 @@ public class UserService : IUserService
                 Role = user.FkRole.Name,
                 CountryName = user.FkCountry?.Name,
                 TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
+                ProfileImagePath = user.ProfileImage,
             };
             userDtos.Add(userData);
         });
@@ -60,6 +61,7 @@ public class UserService : IUserService
             Role = user.FkRole.Name,
             CountryName = user.FkCountry?.Name,
             TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
+            ProfileImagePath = user.ProfileImage,
         };
         return userData;
         // return _mapper.Map<UserDto>(user);
@@ -83,17 +85,18 @@ public class UserService : IUserService
             Role = user.FkRole.Name,
             CountryName = user.FkCountry?.Name,
             TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
+            ProfileImagePath = user.ProfileImage,
         };
         return userData;
     }
 
     public async Task<(bool success, string message)> AddUser(AddEditUserDto user)
     {
+        User? existingUser = await _userRepository.GetByUsernameAsync(user.Username);
+        if (existingUser != null) return (false, "Username already exists.");
         var existing = await _userRepository.GetByEmailAsync(user.Email);
         if (existing != null) return (false,"Email already registered.");
-        User? existingUser = await _userRepository.GetByUsernameAsync(user.Username);
-        if (existingUser != null)
-            return (false, "Username already exists.");
+        
 
         User newUser = new User
         {
@@ -120,6 +123,27 @@ public class UserService : IUserService
             return (false, "Username not available.");
         }
         User existingUserByEmail = await _userRepository.GetByEmailAsync(user.Email);
+
+        // add profile image handling
+        string ProfileImagePath = null;
+        if (user.ProfileImage != null && user.ProfileImage.Length > 0)
+        {
+            var folderPath = "D:/TMSFrontend/assets/images/ProfileImages";
+            if (!Directory.Exists(folderPath))
+            {
+                Directory.CreateDirectory(folderPath);
+            }
+            var filename = Guid.NewGuid().ToString() + Path.GetExtension(user.ProfileImage.FileName);
+            var filePath = Path.Combine(folderPath, filename);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                user.ProfileImage.CopyTo(stream);
+            }
+            ProfileImagePath = "/ProfileImages/" + filename;
+        }
+        if (ProfileImagePath != null)
+            user.ProfileImagePath = ProfileImagePath;
+        // ending profile image handling
 
         user.Password = existingUserByEmail?.Password;
         user.ModifiedAt = DateTime.Now;

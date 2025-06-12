@@ -35,10 +35,14 @@ builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IJWTService, JWTService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ICountryService, CountryService>();
+builder.Services.AddScoped<ITaskService, TaskService>();
+
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ICountryRepository, CountryRepository>();
 builder.Services.AddScoped<ITimezoneRepository, TimezoneRepository>();
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<ITaskAssignRepository,TaskAssignRepository >();
 builder.Services.AddHttpClient<CountryRepository>();
 
     builder.Services.AddAuthentication(options =>
@@ -69,7 +73,7 @@ builder.Services.AddHttpClient<CountryRepository>();
                 {
                     context.Request.Headers["Authorization"] = "Bearer " + token;
                 }
-                return Task.CompletedTask;
+                return System.Threading.Tasks.Task.CompletedTask;
             },
             OnChallenge = context =>
             {

@@ -29,9 +29,13 @@ public partial class User
 
     public DateTime? ModifiedAt { get; set; }
 
+    public string? ProfileImage { get; set; }
+
     public virtual Country? FkCountry { get; set; }
 
     public virtual TimezoneDetail? FkCountryTimezoneNavigation { get; set; }
 
     public virtual Role? FkRole { get; set; }
+
+    public virtual ICollection<TaskAssign> TaskAssigns { get; set; } = new List<TaskAssign>();
 }

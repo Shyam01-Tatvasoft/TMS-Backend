@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace TMS.Repository.Dtos;
 
@@ -44,4 +45,8 @@ public class AddEditUserDto
     public string Username { get; set; } = null!;
 
     public DateTime? ModifiedAt { get; set; }
+
+    public IFormFile? ProfileImage { get; set; }
+
+    public string? ProfileImagePath { get; set; }
 }
