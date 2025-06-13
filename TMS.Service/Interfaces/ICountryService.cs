@@ -1,10 +1,11 @@
 using TMS.Repository.Data;
+using TMS.Repository.Dtos;
 
 namespace TMS.Service.Interfaces;
 
 public interface ICountryService
 {
-    public Task<List<Country>> GetCountries();
-    public Task<List<TimezoneDetail>> GetTimezonesByCountryId(int id);
+    public Task<List<CountryDto>> GetCountries();
+    public Task<List<CountryTimezoneDto>> GetTimezonesByCountryId(int id);
     public Task<string> ImportCountriesAsync();
 }

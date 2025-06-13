@@ -9,7 +9,7 @@ using TMS.Service.Interfaces;
 
 namespace TMS.API.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/dashboard")]
 [EnableCors("AllowSpecificOrigin")]
 public class DashboardController : ControllerBase
 {

@@ -55,12 +55,12 @@ public class CountryRepository: ICountryRepository
                 IsoCode = dto.IsoCode,
                 Flag = dto.Flag,
                 PhoneCode = dto.PhoneCode,
-                TimezoneDetails = dto.timezones?.Select(tz => new TimezoneDetail
+                CountryTimezones = dto.timezones?.Select(tz => new CountryTimezone
                 {
                     Timezone = tz.tzName,
                     Zone = tz.zoneName,
                     Offset = tz.gmtOffsetName
-                }).ToList() ?? new List<TimezoneDetail>()
+                }).ToList() ?? new List<CountryTimezone>()
             };
 
             _context.Countries.Add(country);

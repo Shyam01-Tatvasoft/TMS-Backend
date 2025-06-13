@@ -2,7 +2,7 @@ namespace TMS.Service.Enums;
 
 public class Status
 {
-    enum StatusEnum
+    public enum StatusEnum
     {
         Pending = 1,
         InProgress = 2,

@@ -1,24 +1,24 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 
 namespace TMS.Repository.Dtos;
 
-public class AddEditTaskDto
+public class EditTaskDto
 {
+    [Required]
     public int Id { get; set; }
 
     public string? Description { get; set; }
-
-    public int? FkUserId { get; set; }
     
-    public int? FkTaskId { get; set; }
-
-    public int? FkSubtaskId { get; set; }
-    
+    [Required]
     public JsonElement? TaskData { get; set; }
 
+    [Required]
     public DateTime DueDate { get; set; }
 
+    [Required]
     public int? Status { get; set; }
 
+    [Required]
     public int? Priority { get; set; }
 }

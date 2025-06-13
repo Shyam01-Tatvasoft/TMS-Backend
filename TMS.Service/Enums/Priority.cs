@@ -2,7 +2,7 @@ namespace TMS.Service.Enums;
 
 public class Priority
 {
-    enum PriorityEnum
+    public enum PriorityEnum
     {
         Low = 1,
         Medium = 2,

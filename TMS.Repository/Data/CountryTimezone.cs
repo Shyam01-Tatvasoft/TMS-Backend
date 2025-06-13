@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace TMS.Repository.Data;
 
-public partial class TimezoneDetail
+public partial class CountryTimezone
 {
     public int Id { get; set; }
 

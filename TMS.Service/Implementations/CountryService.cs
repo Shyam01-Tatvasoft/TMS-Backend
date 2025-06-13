@@ -1,4 +1,5 @@
 using TMS.Repository.Data;
+using TMS.Repository.Dtos;
 using TMS.Repository.Interfaces;
 using TMS.Service.Interfaces;
 
@@ -15,16 +16,32 @@ public class CountryService : ICountryService
         _timezoneRepository = timezoneRepository;
     }
 
-    public async Task<List<Country>> GetCountries()
+    public async Task<List<CountryDto>> GetCountries()
     {
         List<Country> countries = await _countryRepository.GetCountries();
-        return countries;
+        List<CountryDto> countryDtos = countries.Select(c => new CountryDto
+        {
+            Id = c.Id,
+            Name = c.Name,
+            IsoCode = c.IsoCode,
+            Flag = c.Flag,
+            PhoneCode = c.PhoneCode
+        }).ToList();
+        return countryDtos;
     }
 
-    public async Task<List<TimezoneDetail>> GetTimezonesByCountryId(int id)
+    public async Task<List<CountryTimezoneDto>> GetTimezonesByCountryId(int id)
     {
-        List<TimezoneDetail> timezones = await _timezoneRepository.GetTimezonesByCountryId(id);
-        return timezones;
+        List<CountryTimezone> timezones = await _timezoneRepository.GetTimezonesByCountryId(id);
+        List<CountryTimezoneDto> countryTimezones = timezones.Select(t => new CountryTimezoneDto
+        {
+            Id = t.Id,
+            Timezone = t.Timezone,
+            FkCountryId = t.FkCountryId,
+            Zone = t.Zone,
+            Offset = t.Offset
+        }).ToList();
+        return countryTimezones;
     }
 
     public async Task<string> ImportCountriesAsync()

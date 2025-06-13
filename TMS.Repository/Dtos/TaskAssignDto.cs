@@ -14,14 +14,13 @@ public class TaskAssignDto
 
     public DateTime DueDate { get; set; }
 
-    public int? Status { get; set; }
+    public string? Status { get; set; }
 
-    public int? Priority { get; set; }
+    public string? Priority { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
    public string TaskName { get; set; } = string.Empty;
    
    public string SubTaskName { get; set; } = string.Empty;
-
 }

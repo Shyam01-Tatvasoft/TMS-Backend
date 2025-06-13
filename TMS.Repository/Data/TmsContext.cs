@@ -17,6 +17,8 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<Country> Countries { get; set; }
 
+    public virtual DbSet<CountryTimezone> CountryTimezones { get; set; }
+
     public virtual DbSet<Role> Roles { get; set; }
 
     public virtual DbSet<SubTask> SubTasks { get; set; }
@@ -24,8 +26,6 @@ public partial class TmsContext : DbContext
     public virtual DbSet<Task> Tasks { get; set; }
 
     public virtual DbSet<TaskAssign> TaskAssigns { get; set; }
-
-    public virtual DbSet<TimezoneDetail> TimezoneDetails { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
 
@@ -54,6 +54,31 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.PhoneCode)
                 .HasMaxLength(100)
                 .HasColumnName("phone_code");
+        });
+
+        modelBuilder.Entity<CountryTimezone>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("timezone_pkey");
+
+            entity.ToTable("country_timezone");
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('timezone_id_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.FkCountryId).HasColumnName("fk_country_id");
+            entity.Property(e => e.Offset)
+                .HasMaxLength(100)
+                .HasColumnName("offset");
+            entity.Property(e => e.Timezone)
+                .HasMaxLength(100)
+                .HasColumnName("timezone");
+            entity.Property(e => e.Zone)
+                .HasMaxLength(100)
+                .HasColumnName("zone");
+
+            entity.HasOne(d => d.FkCountry).WithMany(p => p.CountryTimezones)
+                .HasForeignKey(d => d.FkCountryId)
+                .HasConstraintName("timezone_country_id_fkey");
         });
 
         modelBuilder.Entity<Role>(entity =>
@@ -104,9 +129,12 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp without time zone")
                 .HasColumnName("created_at");
             entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.DueDate).HasColumnName("due_date");
+            entity.Property(e => e.DueDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("due_date");
             entity.Property(e => e.FkSubtaskId).HasColumnName("fk_subtask_id");
             entity.Property(e => e.FkTaskId).HasColumnName("fk_task_id");
             entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
@@ -131,31 +159,6 @@ public partial class TmsContext : DbContext
             entity.HasOne(d => d.FkUser).WithMany(p => p.TaskAssigns)
                 .HasForeignKey(d => d.FkUserId)
                 .HasConstraintName("task_assign_fk_user_id_fkey");
-        });
-
-        modelBuilder.Entity<TimezoneDetail>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("timezone_pkey");
-
-            entity.ToTable("timezone_detail");
-
-            entity.Property(e => e.Id)
-                .HasDefaultValueSql("nextval('timezone_id_seq'::regclass)")
-                .HasColumnName("id");
-            entity.Property(e => e.FkCountryId).HasColumnName("fk_country_id");
-            entity.Property(e => e.Offset)
-                .HasMaxLength(100)
-                .HasColumnName("offset");
-            entity.Property(e => e.Timezone)
-                .HasMaxLength(100)
-                .HasColumnName("timezone");
-            entity.Property(e => e.Zone)
-                .HasMaxLength(100)
-                .HasColumnName("zone");
-
-            entity.HasOne(d => d.FkCountry).WithMany(p => p.TimezoneDetails)
-                .HasForeignKey(d => d.FkCountryId)
-                .HasConstraintName("timezone_country_id_fkey");
         });
 
         modelBuilder.Entity<User>(entity =>

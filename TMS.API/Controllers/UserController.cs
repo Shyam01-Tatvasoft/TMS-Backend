@@ -9,7 +9,7 @@ using TMS.Service.Interfaces;
 
 namespace TMS.API.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/user")]
 [EnableCors("AllowSpecificOrigin")]
 public class UserController : ControllerBase
 {
@@ -24,8 +24,7 @@ public class UserController : ControllerBase
         this._response = new();
     }
 
-    [Authorize(Roles = "Admin")]
-    [HttpGet("GetUsers")]
+    [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<APIResponse>> GetUsers()
@@ -46,7 +45,7 @@ public class UserController : ControllerBase
     }
 
     [ApiExplorerSettings(IgnoreApi = true)]
-    [HttpGet("GetUser")]
+    [HttpGet("get-user")]
     public async Task<ActionResult<APIResponse>> GetUser()
     {
         var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
@@ -80,7 +79,7 @@ public class UserController : ControllerBase
         return Ok(_response);
     }
     
-    [HttpGet("GetUserById/{id}")]
+    [HttpGet("{id}")]
     public async Task<ActionResult<APIResponse>> GetUserById(int id)
     {
         try
@@ -106,7 +105,7 @@ public class UserController : ControllerBase
         }
     }
 
-    [HttpPost("AddUser")]
+    [HttpPost]
     public async Task<ActionResult<APIResponse>> AddUser([FromForm] AddEditUserDto userDto)
     {
         if (!ModelState.IsValid)

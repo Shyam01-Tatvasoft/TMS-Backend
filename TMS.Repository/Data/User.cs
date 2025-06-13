@@ -33,7 +33,7 @@ public partial class User
 
     public virtual Country? FkCountry { get; set; }
 
-    public virtual TimezoneDetail? FkCountryTimezoneNavigation { get; set; }
+    public virtual CountryTimezone? FkCountryTimezoneNavigation { get; set; }
 
     public virtual Role? FkRole { get; set; }
 

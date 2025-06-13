@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
@@ -6,162 +7,128 @@ using TMS.Service.Interfaces;
 namespace TMS.API.Controllers;
 
 [Route("api/tasks")]
+[EnableCors("AllowSpecificOrigin")]
 [ApiController]
 public class TaskController : ControllerBase
 {
     private readonly ITaskService _taskService;
     private readonly APIResponse _response;
+    private readonly IJWTService _jwtService;
 
-    public TaskController(ITaskService taskService)
+    public TaskController(ITaskService taskService, IJWTService jwtService)
     {
         _taskService = taskService;
+        _jwtService = jwtService;
         _response = new APIResponse();
     }
 
     [HttpGet]
-    public async Task<ActionResult<APIResponse>> GetAllTaskAssign()
+    public async Task<IActionResult> GetAllTaskAssign()
     {
+        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
         try
         {
-            var taskAssigns = await _taskService.GetAllTaskAssignAsync();
-            _response.Result = taskAssigns;
-            _response.StatusCode = HttpStatusCode.OK;
-            return Ok(_response);
+            var (email, role, userId) = _jwtService.ValidateToken(authToken);
+            var taskAssigns = await _taskService.GetAllTaskAssignAsync(int.Parse(userId),role);
+            return Ok(taskAssigns);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { ex.Message };
-            return StatusCode(500, _response);
+            return StatusCode(500);
         }
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<APIResponse>> GetTaskAssign(int id)
+    public async Task<IActionResult> GetTaskAssign(int id)
     {
         try
         {
             var taskAssign = await _taskService.GetTaskAssignAsync(id);
             if (taskAssign == null)
             {
-                _response.IsSuccess = false;
-                _response.ErrorMessage = new List<string> { "Task Assign not found" };
-                return NotFound(_response);
+                return NotFound();
             }
-            _response.Result = taskAssign;
-            _response.StatusCode = HttpStatusCode.OK;
-            return Ok(_response);
+            return Ok(taskAssign);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { ex.Message };
-            return StatusCode(500, _response);
+            return StatusCode(500);
         }
     }
 
     [HttpPost]
-    public async Task<ActionResult<APIResponse>> AddTaskAssign([FromBody] AddEditTaskDto taskDto)
+    public async Task<IActionResult> AddTaskAssign([FromBody] AddTaskDto taskDto)
     {
-        if (!ModelState.IsValid)
-        {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-            _response.StatusCode = HttpStatusCode.BadRequest;
-            return BadRequest(_response);
-        }
-
         try
         {
             var result = await _taskService.AddTaskAssignAsync(taskDto);
-            if (!result.success)
+            if (result.id == 0)
             {
-                _response.IsSuccess = false;
-                _response.ErrorMessage = new List<string> { result.message };
-                _response.StatusCode = HttpStatusCode.BadRequest;
-                return BadRequest(_response);
+                return BadRequest(result.message);
             }
-            _response.IsSuccess = true;
-            _response.StatusCode = HttpStatusCode.Created;
-            _response.Result = result.message;
-            return CreatedAtAction(nameof(GetTaskAssign), new { id = taskDto.Id }, _response);
+            return Created($"/api/tasks/",result.id);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { ex.Message };
-            return StatusCode(500, _response);
+            return StatusCode(500);
         }
     }
 
     [HttpPut]
-    public async Task<ActionResult<APIResponse>> UpdateTaskAssign([FromBody] AddEditTaskDto taskDto)
+    public async Task<IActionResult> UpdateTaskAssign([FromBody] EditTaskDto taskDto)
     {
-        if (!ModelState.IsValid)
-        {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-            _response.StatusCode = HttpStatusCode.BadRequest;
-            return BadRequest(_response);
-        }
+        // if (!ModelState.IsValid)
+        // {
+        //     _response.IsSuccess = false;
+        //     _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+        //     _response.StatusCode = HttpStatusCode.BadRequest;
+        //     return BadRequest(_response);
+        // }
 
         try
         {
             var result = await _taskService.UpdateTaskAssignAsync(taskDto);
             if (!result.success)
             {
-                _response.IsSuccess = false;
-                _response.ErrorMessage = new List<string> { result.message };
-                _response.StatusCode = HttpStatusCode.BadRequest;
-                return BadRequest(_response);
+                return BadRequest(result.message);
             }
-            _response.IsSuccess = true;
-            _response.StatusCode = HttpStatusCode.OK;
-            _response.Result = result.message;
-            return Ok(_response);
+            return Ok(result.message);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { ex.Message };
-            return StatusCode(500, _response);
+            return StatusCode(500);
         }
     }
 
     [HttpGet("get-tasks")]
-    public async Task<ActionResult<APIResponse>> GetAllTasks()
+    public async Task<IActionResult> GetAllTasks()
     {
         try
         {
             var tasks = await _taskService.GetAllTasksAsync();
-            _response.Result = tasks;
-            _response.StatusCode = HttpStatusCode.OK;
-            return Ok(_response);
+            return Ok(tasks);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { ex.Message };
-            return StatusCode(500, _response);
+            return StatusCode(500);
         }
     }
 
     [HttpGet("get-sub-tasks/{id}")]
-    public async Task<ActionResult<APIResponse>> GetSubTasksByTaskId(int id)
+    public async Task<IActionResult> GetSubTasksByTaskId(int id)
     {
         try
         {
             var subTasks = await _taskService.GetSubTasksByTaskIdAsync(id);
             if (subTasks == null || !subTasks.Any())
             {
-                _response.IsSuccess = false;
-                _response.ErrorMessage = new List<string> { "No sub-tasks found for this task." };
-                _response.StatusCode = HttpStatusCode.NotFound;
-                return NotFound(_response);
+                return NotFound();
             }
-            _response.Result = subTasks;
-            _response.StatusCode = HttpStatusCode.OK;
-            return Ok(_response);
+            return Ok(subTasks);
         }
         catch (Exception ex)
         {

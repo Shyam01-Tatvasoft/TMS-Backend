@@ -5,10 +5,10 @@ namespace TMS.Service.Interfaces;
 
 public interface ITaskService
 {
-    public Task<List<TaskAssignDto>> GetAllTaskAssignAsync();
-    public Task<TaskAssignDto?> GetTaskAssignAsync(int id);
-    public Task<(bool success,string message)> AddTaskAssignAsync(AddEditTaskDto task);
-    public Task<(bool success, string message)> UpdateTaskAssignAsync(AddEditTaskDto task);
-    public Task<List<SubTask>> GetSubTasksByTaskIdAsync(int id);
-    public Task<List<Repository.Data.Task>> GetAllTasksAsync();
+    public Task<List<TaskAssignDto>> GetAllTaskAssignAsync(int id, string role);
+    public Task<UpdateTaskDto?> GetTaskAssignAsync(int id);
+    public Task<(int id, string message)> AddTaskAssignAsync(AddTaskDto task);
+    public Task<(bool success, string message)> UpdateTaskAssignAsync(EditTaskDto task);
+    public Task<List<SubTaskDto>> GetSubTasksByTaskIdAsync(int id);
+    public Task<List<TaskDto>> GetAllTasksAsync();
 }

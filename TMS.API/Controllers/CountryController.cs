@@ -9,7 +9,7 @@ using TMS.Service.Interfaces;
 namespace TMS.API.Controllers;
 
 
-[Route("api/[controller]")]
+[Route("api/country")]
 [EnableCors("AllowSpecificOrigin")]
 [ApiController]
 public class CountryController : ControllerBase
@@ -46,7 +46,7 @@ public class CountryController : ControllerBase
     {
         try
         {
-            List<TimezoneDetail> timezones = await _countryService.GetTimezonesByCountryId(id);
+            List<CountryTimezoneDto> timezones = await _countryService.GetTimezonesByCountryId(id);
             if (timezones == null)
             {
                 _response.ErrorMessage = new List<string> { "No timezone found" };

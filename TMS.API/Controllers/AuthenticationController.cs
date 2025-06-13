@@ -8,7 +8,7 @@ using TMS.Service.Interfaces;
 
 namespace TMS.API.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/authentication")]
 [EnableCors("AllowSpecificOrigin")]
 [ApiController]
 public class AuthenticationController : ControllerBase

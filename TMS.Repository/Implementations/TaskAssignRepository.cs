@@ -12,17 +12,31 @@ public class TaskAssignRepository : ITaskAssignRepository
         _context = context;
     }
 
-    public async Task<List<TaskAssign>> GetAllTaskAssignAsync()
+    public async Task<List<TaskAssign>> GetAllTaskAssignAsync(int id, string role)
     {
-        return await _context.TaskAssigns
-        .Include(t => t.FkTask)
-        .Include(t => t.FkSubtask)
-        .ToListAsync();
+        if (role == "Admin")
+        {
+            return await _context.TaskAssigns
+            .Include(t => t.FkUser)
+            .Include(t => t.FkTask)
+            .Include(t => t.FkSubtask)
+            .ToListAsync();
+        }
+        else
+        {
+            return await _context.TaskAssigns
+            .Where(t => t.FkUserId == id)
+            .Include(t => t.FkUser)
+            .Include(t => t.FkTask)
+            .Include(t => t.FkSubtask)
+            .ToListAsync();
+        }
     }
 
     public async Task<TaskAssign?> GetTaskAssignAsync(int id)
     {
         return await _context.TaskAssigns.Where(t => t.Id == id)
+        .Include(t => t.FkUser)
         .Include(t => t.FkTask)
         .ThenInclude(t => t.SubTasks)
         .FirstOrDefaultAsync();

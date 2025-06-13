@@ -15,7 +15,7 @@ public partial class Country
 
     public string? PhoneCode { get; set; }
 
-    public virtual ICollection<TimezoneDetail> TimezoneDetails { get; set; } = new List<TimezoneDetail>();
+    public virtual ICollection<CountryTimezone> CountryTimezones { get; set; } = new List<CountryTimezone>();
 
     public virtual ICollection<User> Users { get; set; } = new List<User>();
 }
