@@ -37,5 +37,7 @@ public partial class User
 
     public virtual Role? FkRole { get; set; }
 
+    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+
     public virtual ICollection<TaskAssign> TaskAssigns { get; set; } = new List<TaskAssign>();
 }

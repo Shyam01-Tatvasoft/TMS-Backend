@@ -19,6 +19,8 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<CountryTimezone> CountryTimezones { get; set; }
 
+    public virtual DbSet<Notification> Notifications { get; set; }
+
     public virtual DbSet<Role> Roles { get; set; }
 
     public virtual DbSet<SubTask> SubTasks { get; set; }
@@ -79,6 +81,26 @@ public partial class TmsContext : DbContext
             entity.HasOne(d => d.FkCountry).WithMany(p => p.CountryTimezones)
                 .HasForeignKey(d => d.FkCountryId)
                 .HasConstraintName("timezone_country_id_fkey");
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("notification_pkey");
+
+            entity.ToTable("notification");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.FkTaskId).HasColumnName("fk_task_id");
+            entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
+            entity.Property(e => e.IsRead).HasColumnName("is_read");
+
+            entity.HasOne(d => d.FkTask).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.FkTaskId)
+                .HasConstraintName("notification_fk_task_id_fkey");
+
+            entity.HasOne(d => d.FkUser).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.FkUserId)
+                .HasConstraintName("notification_fk_user_id_fkey");
         });
 
         modelBuilder.Entity<Role>(entity =>

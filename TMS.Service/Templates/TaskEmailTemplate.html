@@ -1,83 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7"
-      crossorigin="anonymous"
-    />
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
-      integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.min.js"
-      integrity="sha384-VQqxDN0EQCkWoxt/0vsQvZswzTHUVOImccYmSyhJTp7kGtPed0Qcx8rK9h9YEgx+"
-      crossorigin="anonymous"
-    ></script>
-    <style>
-      .mail-content{
-        padding: 15px;
-        background-color: #cccc;
-      }
-      .mail-text{
-        margin-top: 0px;
-        margin-bottom: 0px;
-      }
-      .email-header{
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-    </style>
-  </head>
 
-  <body>
-    <div class="w-50">
-      <div style="background-color: #005b9cee" class="email-header d-flex justify-content-center align-items-center">
-        <img src="../wwwroot/images/logos/pizzashop_logo.png" height="40px" width="50px"/>
-        <p
-          style="
-            font-weight: bold;
-            font-size: xx-large;
-            color: white;
-            text-align: center;
-            margin-top: 0px;
-            margin-bottom: 0px;
-          "
-          class="mt-0 mb-0"
-        >
-          Task Management System
-        </p>
-      </div>
-      <div class="mail-content">
-        <p class="mail-text">Task Management System,</p>
-        <p class="mail-text">
-          Please click <a href="{{Link}}" title="resetPasswordLink">here</a> for
-          setup your account password.
-        </p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Notification</title>
+  <style>
+    .container {
+      width: 90%;
+      max-width: 600px;
+      margin: 0 auto;
+      font-family: Arial, sans-serif;
+    }
 
-        <p class="mail-text">
-          If you encounter any issues or have any question, please do not
-          hesitate to contact our support team.
-        </p>
-        <p class="mail-text">
-          <span style="color: orange">Important Note: </span>For Security
-          reasons, the link will expire in 24 hours. If you did not request a
-          password setup, please ignore this email or contact our support team
-          immediately.
-        </p>
-      </div>
+    .header {
+      background-color: #005b9c;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .header img {
+      height: 40px;
+      margin-right: 15px;
+    }
+
+    .content {
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+
+    .content p {
+      margin: 5px 0;
+    }
+
+    .label {
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Task Management System</h2>
     </div>
-  </body>
+    <div class="content">
+      <p>Hello <b>{{UserName}}</b>,</p>
+      <p>You have been assigned a new task. Below are the task details:</p>
+      <p><span class="label">Task Type:</span> {{TaskType}}</p>
+      <p><span class="label">Sub Task:</span> {{SubTask}}</p>
+      <p><span class="label">Priority:</span> {{Priority}}</p>
+      <p><span class="label">Current Status:</span> {{Status}}</p>
+      <p><span class="label">Description:</span> {{Description}}</p>
+      <p><span class="label">Due Date:</span> {{DueDate}}</p>
+      <br />
+      <p>
+        Please take the necessary actions. If you have any questions, contact
+        your project manager or support team.
+      </p>
+      <p>Regards,</p>
+      <p><b>Task Management System</b></p>
+    </div>
+  </div>
+</body>
+
 </html>

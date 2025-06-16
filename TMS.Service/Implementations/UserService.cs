@@ -45,6 +45,11 @@ public class UserService : IUserService
         // return _mapper.Map<List<UserDto>>(users);
     }
 
+    public async Task<(List<UserDto>,int count)> GetUsers(int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
+    {
+         return await _userRepository.GetUsers(skip, take, search, sorting, sortDirection);
+    }
+
     public async Task<UserDto?> GetUserByEmail(string? email)
     {
         User? user = await _userRepository.GetByEmailAsync(email);

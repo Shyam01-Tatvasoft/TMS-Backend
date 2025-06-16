@@ -24,7 +24,7 @@ public class DashboardController : ControllerBase
     }
 
 
-    [HttpGet("dashboard")]
+    [HttpGet]
     public async Task<ActionResult<APIResponse>> Dashboard()
     {
         var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");

@@ -27,20 +27,49 @@ public class UserController : ControllerBase
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<APIResponse>> GetUsers()
+    public async Task<IActionResult> GetUsers()
     {
         try
         {
             List<UserDto> userList = await _userService.GetUsers();
-            _response.Result =  new { data = userList };
-            _response.StatusCode = HttpStatusCode.OK;
-            return Ok(_response);
+            return Ok(userList);
         }
-        catch (System.Exception ex)
+        catch (System.Exception)
         {
-            _response.StatusCode = HttpStatusCode.InternalServerError;
-            _response.ErrorMessage = new List<string> { ex.Message };
-            return StatusCode((int)HttpStatusCode.InternalServerError, _response);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpPost("get-users")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetFilteredUsers()
+    {
+        try
+        {
+            var draw = Request.Form["draw"].FirstOrDefault();
+            var start = Request.Form["start"].FirstOrDefault();
+            var length = Request.Form["length"].FirstOrDefault();
+            var searchValue = Request.Form["search[value]"].FirstOrDefault();
+
+            int pageSize = length != null ? Convert.ToInt32(length) : 0;
+            int skip = start != null ? Convert.ToInt32(start) : 0;
+            var sorting = Request.Form["order[0][column]"].FirstOrDefault();
+            var sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
+            
+            var (userList , totalCount)= await _userService.GetUsers( skip, pageSize, searchValue, sorting, sortDirection);
+            var result = new
+            {
+                draw = draw,
+                recordsFiltered = totalCount,
+                recordsTotal = totalCount,
+                data = userList
+            };
+            return Ok(result);
+        }
+        catch (System.Exception)
+        {
+            return StatusCode(500);
         }
     }
 

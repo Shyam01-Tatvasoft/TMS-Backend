@@ -21,6 +21,78 @@ public class UserRepository : IUserRepository
         .ToListAsync();
     }
 
+    public async Task<(List<UserDto>,int count)> GetUsers(int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
+    {
+        var query = _context.Users.Where(u => u.IsDeleted == false)
+            .Include(u => u.FkRole)
+            .Include(u => u.FkCountry)
+            .Include(u => u.FkCountryTimezoneNavigation)
+            .AsQueryable();
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            search = search.ToLower();
+            query = query.Where(u =>
+                u.FirstName.ToLower().Contains(search) ||
+                u.LastName.ToLower().Contains(search) ||
+                u.Email.ToLower().Contains(search) ||
+                u.Username.ToLower().Contains(search));
+        }
+
+        if (!string.IsNullOrEmpty(sorting) && !string.IsNullOrEmpty(sortDirection))
+        {
+            if (sortDirection.ToLower() == "asc")
+            {
+                query = sorting switch
+                {
+                    "0" => query.OrderBy(u => u.FirstName),
+                    "1" => query.OrderBy(u => u.LastName),
+                    "2" => query.OrderBy(u => u.Username),
+                    "3" => query.OrderBy(u => u.Email),
+                    _ => query.OrderBy(u => u.FirstName)
+                };
+            }
+            else
+            {
+                query = sorting switch
+                {
+                     "0" => query.OrderByDescending(u => u.FirstName),
+                    "1" => query.OrderByDescending(u => u.LastName),
+                    "2" => query.OrderByDescending(u => u.Username),
+                    "3" => query.OrderByDescending(u => u.Email),
+                    _ => query.OrderByDescending(u => u.FirstName)
+                };
+            }
+        }
+        else
+        {
+            query = query.OrderByDescending(u => u.Id);
+        }
+        int totalCount = await query.CountAsync();
+
+        List<UserDto> users = await query
+            .Skip(skip)
+            .Take(take)
+            .Select(u => new UserDto
+            {
+                Id = u.Id,
+                Email = u.Email,
+                Username = u.Username,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                FkCountryId = u.FkCountryId,
+                FkCountryTimezone = u.FkCountryTimezone,
+                Phone = u.Phone,
+                Role = u.FkRole.Name,
+                CountryName = u.FkCountry.Name,
+                TimezoneName = u.FkCountryTimezoneNavigation.Timezone,
+                ProfileImagePath = u.ProfileImage
+            })
+            .ToListAsync();
+
+        return (users, totalCount);
+    }
+
     public async Task<User?> GetByEmailAsync(string email)
     {
         return await _context.Users.Where(u => u.Email == email.Trim() && u.IsDeleted == false)

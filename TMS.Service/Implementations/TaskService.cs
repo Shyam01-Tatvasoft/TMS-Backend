@@ -11,11 +11,15 @@ public class TaskService : ITaskService
 {
     private readonly ITaskAssignRepository _taskAssignRepository;
     private readonly ITaskRepository _taskRepository;
+    private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
 
-    public TaskService(ITaskAssignRepository taskAssignRepository, ITaskRepository taskRepository)
+    public TaskService(ITaskAssignRepository taskAssignRepository, ITaskRepository taskRepository,IEmailService emailService,INotificationService notificationService)
     {
         _taskAssignRepository = taskAssignRepository;
         _taskRepository = taskRepository;
+        _emailService = emailService;
+        _notificationService = notificationService;
     }
 
     public async Task<List<TaskDto>> GetAllTasksAsync()
@@ -42,24 +46,9 @@ public class TaskService : ITaskService
         return subTaskDtos;
     }
 
-    public async Task<List<TaskAssignDto>> GetAllTaskAssignAsync(int id, string role)
+    public async Task<(List<TaskAssignDto>,int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
     {
-        List<TaskAssign> TaskAssignList = await _taskAssignRepository.GetAllTaskAssignAsync(id, role);
-        List<TaskAssignDto> taskAssignDtos = TaskAssignList.Select(taskAssign => new TaskAssignDto
-        {
-            Id = taskAssign.Id,
-            UserName = taskAssign?.FkUser?.FirstName + " " + taskAssign?.FkUser?.LastName,
-            Description = taskAssign.Description,
-            TaskData = !string.IsNullOrEmpty(taskAssign.TaskData) ? JsonSerializer.Deserialize<JsonElement>(taskAssign.TaskData!) : null,
-            DueDate = taskAssign.DueDate,
-            Status = ((Status.StatusEnum)taskAssign.Status.Value).ToString(),
-            Priority = ((Priority.PriorityEnum)taskAssign.Priority.Value).ToString(),
-            CreatedAt = taskAssign.CreatedAt,
-            TaskName = taskAssign.FkTask?.Name ?? string.Empty,
-            SubTaskName = taskAssign.FkSubtask?.Name ?? string.Empty
-        }).ToList();
-
-        return taskAssignDtos;
+        return await _taskAssignRepository.GetAllTaskAssignAsync(id, role,skip,take,search, sorting, sortDirection);
     }
 
     public async Task<UpdateTaskDto?> GetTaskAssignAsync(int id)
@@ -96,7 +85,9 @@ public class TaskService : ITaskService
             CreatedAt = DateTime.Now,  
         };
         await _taskAssignRepository.AddTaskAssignAsync(newTask);
-
+        await _notificationService.AddNotification((int)task.FkUserId, newTask.Id);
+        string emailBody = await GetTaskEmailBody(newTask.Id);
+        _emailService.SendMail(newTask.FkUser.Email, "New Task Assigned", emailBody);
         return (newTask.Id, "Task assigned successfully.");
     }
 
@@ -117,5 +108,28 @@ public class TaskService : ITaskService
         await _taskAssignRepository.UpdateTaskAssignAsync(existingTask);
 
         return (true, "Task updated successfully.");
+    }
+
+    public async Task<string> GetTaskEmailBody(int id, string templateName = "TaskEmailTemplate")
+    {
+        TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(id);
+        string templatePath = $"d:/TMS/TMS.Service/Templates/{templateName}.html";
+
+        if (!System.IO.File.Exists(templatePath))
+        {
+            return "<p>Email template not found</p>";
+        }
+
+        string emailBody = System.IO.File.ReadAllText(templatePath);
+
+        emailBody = emailBody.Replace("{{UserName}}", task?.FkUser.FirstName + " " + task.FkUser.LastName ?? "User");
+        emailBody = emailBody.Replace("{{TaskType}}", task.FkTask?.Name ?? "-");
+        emailBody = emailBody.Replace("{{SubTask}}", task.FkSubtask?.Name ?? "-");
+        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority.Value).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status.Value).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{DueDate}}", task.DueDate.ToString("dd MMM yyyy"));
+        emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
+
+        return emailBody;
     }
 }

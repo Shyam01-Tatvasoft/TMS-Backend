@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using TMS.API.Hubs;
 using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
 
@@ -14,15 +16,17 @@ public class TaskController : ControllerBase
     private readonly ITaskService _taskService;
     private readonly APIResponse _response;
     private readonly IJWTService _jwtService;
+    private readonly IHubContext<NotificationHub> _hubContext;
 
-    public TaskController(ITaskService taskService, IJWTService jwtService)
+    public TaskController(ITaskService taskService, IJWTService jwtService, IHubContext<NotificationHub> hubContext)
     {
         _taskService = taskService;
         _jwtService = jwtService;
+        _hubContext = hubContext;
         _response = new APIResponse();
     }
 
-    [HttpGet]
+    [HttpPost("get-tasks")]
     public async Task<IActionResult> GetAllTaskAssign()
     {
         var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
@@ -33,8 +37,28 @@ public class TaskController : ControllerBase
         try
         {
             var (email, role, userId) = _jwtService.ValidateToken(authToken);
-            var taskAssigns = await _taskService.GetAllTaskAssignAsync(int.Parse(userId),role);
-            return Ok(taskAssigns);
+            if (email == null || role == null || userId == null)
+                return Unauthorized();
+            var draw = Request.Form["draw"].FirstOrDefault();
+            var start = Request.Form["start"].FirstOrDefault();
+            var length = Request.Form["length"].FirstOrDefault();
+            var searchValue = Request.Form["search[value]"].FirstOrDefault();
+
+            int pageSize = length != null ? Convert.ToInt32(length) : 0;
+            int skip = start != null ? Convert.ToInt32(start) : 0;
+            var sorting = Request.Form["order[0][column]"].FirstOrDefault();
+            var sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
+
+            var (taskList, totalCount) = await _taskService.GetAllTaskAssignAsync(int.Parse(userId), role, skip, pageSize, searchValue,sorting, sortDirection);
+
+            var result = new
+            {
+                draw = draw,
+                recordsFiltered = totalCount,
+                recordsTotal = totalCount,
+                data = taskList
+            };
+            return Ok(result);
         }
         catch (Exception)
         {
@@ -70,7 +94,10 @@ public class TaskController : ControllerBase
             {
                 return BadRequest(result.message);
             }
-            return Created($"/api/tasks/",result.id);
+            string? userId = taskDto.FkUserId.ToString();
+            string message = "New Task Assigned!";
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", userId , message);
+            return Created($"/api/tasks/", result.id);
         }
         catch (Exception)
         {
@@ -81,14 +108,6 @@ public class TaskController : ControllerBase
     [HttpPut]
     public async Task<IActionResult> UpdateTaskAssign([FromBody] EditTaskDto taskDto)
     {
-        // if (!ModelState.IsValid)
-        // {
-        //     _response.IsSuccess = false;
-        //     _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-        //     _response.StatusCode = HttpStatusCode.BadRequest;
-        //     return BadRequest(_response);
-        // }
-
         try
         {
             var result = await _taskService.UpdateTaskAssignAsync(taskDto);
@@ -137,5 +156,5 @@ public class TaskController : ControllerBase
             return StatusCode(500, _response);
         }
     }
-    
+
 }

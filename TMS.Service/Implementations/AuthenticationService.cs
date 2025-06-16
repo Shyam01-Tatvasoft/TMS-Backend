@@ -160,7 +160,6 @@ public class AuthenticationService : IAuthenticationService
         mailMessage.To.Add(ToEmail);
         mailMessage.Subject = subject;
         mailMessage.IsBodyHtml = true;
-        // StringBuilder mailBody = new StringBuilder();
         mailMessage.Body = body;
 
         smtpClient.Send(mailMessage);
