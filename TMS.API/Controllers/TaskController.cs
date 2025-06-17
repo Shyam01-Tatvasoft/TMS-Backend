@@ -108,9 +108,18 @@ public class TaskController : ControllerBase
     [HttpPut]
     public async Task<IActionResult> UpdateTaskAssign([FromBody] EditTaskDto taskDto)
     {
+        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
         try
         {
-            var result = await _taskService.UpdateTaskAssignAsync(taskDto);
+            var (email, role, userId) = _jwtService.ValidateToken(authToken);
+            if (email == null || role == null || userId == null)
+                return Unauthorized();
+            
+            var result = await _taskService.UpdateTaskAssignAsync(taskDto,role);
             if (!result.success)
             {
                 return BadRequest(result.message);

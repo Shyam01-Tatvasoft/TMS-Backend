@@ -32,4 +32,6 @@ public partial class TaskAssign
     public virtual User? FkUser { get; set; }
 
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+
+    public virtual ICollection<TaskAction> TaskActions { get; set; } = new List<TaskAction>();
 }

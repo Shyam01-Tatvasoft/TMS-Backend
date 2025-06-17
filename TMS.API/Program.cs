@@ -39,7 +39,8 @@ builder.Services.AddScoped<ICountryService, CountryService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-
+builder.Services.AddScoped<IHolidayService, HolidayService>();
+builder.Services.AddHttpClient<HolidayService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ICountryRepository, CountryRepository>();

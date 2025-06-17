@@ -1,8 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 using System.Text.Json;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
+using TMS.Repository.Enums;
 using TMS.Repository.Interfaces;
-using TMS.Service.Enums;
 using TMS.Service.Interfaces;
 
 namespace TMS.Service.Implementations;
@@ -13,13 +15,17 @@ public class TaskService : ITaskService
     private readonly ITaskRepository _taskRepository;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
+    private readonly IHolidayService _holidayService;
+    private readonly IUserRepository _userRepository;
 
-    public TaskService(ITaskAssignRepository taskAssignRepository, ITaskRepository taskRepository,IEmailService emailService,INotificationService notificationService)
+    public TaskService(ITaskAssignRepository taskAssignRepository, ITaskRepository taskRepository, IEmailService emailService, INotificationService notificationService, IHolidayService holidayService, IUserRepository userRepository)
     {
         _taskAssignRepository = taskAssignRepository;
         _taskRepository = taskRepository;
         _emailService = emailService;
         _notificationService = notificationService;
+        _holidayService = holidayService;
+        _userRepository = userRepository;
     }
 
     public async Task<List<TaskDto>> GetAllTasksAsync()
@@ -46,32 +52,46 @@ public class TaskService : ITaskService
         return subTaskDtos;
     }
 
-    public async Task<(List<TaskAssignDto>,int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
+    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
     {
-        return await _taskAssignRepository.GetAllTaskAssignAsync(id, role,skip,take,search, sorting, sortDirection);
+        return await _taskAssignRepository.GetAllTaskAssignAsync(id, role, skip, take, search, sorting, sortDirection);
     }
 
     public async Task<UpdateTaskDto?> GetTaskAssignAsync(int id)
     {
-        TaskAssign taskAssign = await _taskAssignRepository.GetTaskAssignAsync(id);
-        UpdateTaskDto TaskAssignDto = new()
+        TaskAssign? taskAssign = await _taskAssignRepository.GetTaskAssignAsync(id);
+        UpdateTaskDto TaskAssignDto = new();
+        if (taskAssign != null)
         {
-            Id = taskAssign.Id,
-            FkUserId = taskAssign.FkUserId,
-            FkTaskId = taskAssign.FkTaskId,
-            FkSubTaskId = taskAssign.FkSubtaskId,
-            TaskData = !string.IsNullOrEmpty(taskAssign.TaskData) ? JsonSerializer.Deserialize<JsonElement>(taskAssign.TaskData!) : null,
-            Status = taskAssign.Status,
-            Priority = taskAssign.Priority,
-            DueDate = taskAssign.DueDate,
-            Description = taskAssign.Description,
-        };
+            TaskAssignDto = new()
+            {
+                Id = taskAssign.Id,
+                FkUserId = taskAssign.FkUserId,
+                FkTaskId = taskAssign.FkTaskId,
+                FkSubTaskId = taskAssign.FkSubtaskId,
+                TaskData = !string.IsNullOrEmpty(taskAssign.TaskData) ? JsonSerializer.Deserialize<JsonElement>(taskAssign.TaskData!) : null,
+                Status = taskAssign.Status,
+                Priority = taskAssign.Priority,
+                DueDate = taskAssign.DueDate,
+                Description = taskAssign.Description,
+            };
+        }
 
         return TaskAssignDto;
     }
 
     public async Task<(int id, string message)> AddTaskAssignAsync(AddTaskDto task)
     {
+        User? user = await _userRepository.GetByIdAsync((int)task.FkUserId!);
+        if (user == null)
+            return (0, "User not found");
+
+
+        bool isHoliday = await _holidayService.IsHolidayAsync(user?.FkCountry?.IsoCode!, task.DueDate);
+        if (isHoliday)
+        {
+            return (0, $"Cannot assign task deadline {task.DueDate:yyyy-MM-dd} because it's a public holiday in {user?.FkCountry?.Name}.");
+        }
         TaskAssign newTask = new()
         {
             Description = task.Description,
@@ -82,7 +102,7 @@ public class TaskService : ITaskService
             DueDate = task.DueDate,
             Status = task.Status,
             Priority = task.Priority,
-            CreatedAt = DateTime.Now,  
+            CreatedAt = DateTime.Now,
         };
         await _taskAssignRepository.AddTaskAssignAsync(newTask);
         await _notificationService.AddNotification((int)task.FkUserId, newTask.Id);
@@ -91,12 +111,17 @@ public class TaskService : ITaskService
         return (newTask.Id, "Task assigned successfully.");
     }
 
-    public async Task<(bool success, string message)> UpdateTaskAssignAsync(EditTaskDto task)
+    public async Task<(bool success, string message)> UpdateTaskAssignAsync(EditTaskDto task, string role)
     {
         TaskAssign? existingTask = await _taskAssignRepository.GetTaskAssignAsync(task.Id);
         if (existingTask == null)
         {
             return (false, "Task not found.");
+        }
+
+        if (role == "Admin" && existingTask.Status.HasValue && (Status.StatusEnum)existingTask.Status.Value == Status.StatusEnum.InProgress && existingTask.Status != task.Status)
+        {
+            return (false, "Cannot change the status of a task that is in progress.");
         }
 
         existingTask.Description = task.Description;
@@ -131,5 +156,14 @@ public class TaskService : ITaskService
         emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
 
         return emailBody;
+    }
+
+    public string GetDisplayName(Enum enumValue)
+    {
+        return enumValue.GetType()
+                        .GetMember(enumValue.ToString())
+                        .First()
+                        .GetCustomAttributes<DisplayAttribute>()?
+                        .FirstOrDefault()?.Name ?? enumValue.ToString();
     }
 }

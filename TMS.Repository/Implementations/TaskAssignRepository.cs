@@ -1,9 +1,11 @@
+using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
+using TMS.Repository.Enums;
 using TMS.Repository.Interfaces;
-using TMS.Service.Enums;
 
 namespace TMS.Repository.Implementations;
 
@@ -15,7 +17,7 @@ public class TaskAssignRepository : ITaskAssignRepository
         _context = context;
     }
 
-    public async Task<(List<TaskAssignDto>,int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting, string? sortDirection)
+    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting, string? sortDirection)
     {
         var query = _context.TaskAssigns
             .Include(t => t.FkUser)
@@ -71,9 +73,8 @@ public class TaskAssignRepository : ITaskAssignRepository
                 Id = taskAssign.Id,
                 UserName = taskAssign.FkUser.FirstName + " " + taskAssign.FkUser.LastName,
                 Description = taskAssign.Description,
-                // TaskData = !string.IsNullOrEmpty(taskAssign.TaskData) ? JsonSerializer.Deserialize<JsonElement>(taskAssign.TaskData, new JsonSerializerOptions()) : null,
                 DueDate = taskAssign.DueDate,
-                Status = ((Status.StatusEnum)taskAssign.Status.Value).ToString(),
+                Status = ((Status.StatusEnum)taskAssign.Status).ToDescription(),
                 Priority =((Priority.PriorityEnum)taskAssign.Priority.Value).ToString(),
                 CreatedAt = taskAssign.CreatedAt,
                 TaskName = taskAssign.FkTask.Name ?? string.Empty,
@@ -81,26 +82,11 @@ public class TaskAssignRepository : ITaskAssignRepository
             })
             .ToListAsync();
 
-            return  (tasks, totalCount);
-        // if (role == "Admin")
-        // {
-        //     return await _context.TaskAssigns
-        //     .Include(t => t.FkUser)
-        //     .Include(t => t.FkTask)
-        //     .Include(t => t.FkSubtask)
-        //     .ToListAsync();
-        // }
-        // else
-        // {
-        //     return await _context.TaskAssigns
-        //     .Where(t => t.FkUserId == id)
-        //     .Include(t => t.FkUser)
-        //     .Include(t => t.FkTask)
-        //     .Include(t => t.FkSubtask)
-        //     .ToListAsync();
-        // }
-    }
 
+
+        return (tasks, totalCount);
+    }
+    
     public async Task<TaskAssign?> GetTaskAssignAsync(int id)
     {
         return await _context.TaskAssigns.Where(t => t.Id == id)
@@ -121,4 +107,5 @@ public class TaskAssignRepository : ITaskAssignRepository
         _context.TaskAssigns.Update(task);
         await _context.SaveChangesAsync();
     }
+
 }

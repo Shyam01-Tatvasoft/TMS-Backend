@@ -31,7 +31,7 @@ public class NotificationRepository : INotificationRepository
 
     public async Task<int> UpdateNotificationAsync(int id)
     {
-        Notification? notification = await _context.Notifications.Where(n => n.Id == id && n.IsRead == false).FirstOrDefaultAsync();
+        Notification? notification = await _context.Notifications.Where(n => n.Id == id).FirstOrDefaultAsync();
         if(notification?.IsRead == true)
         {
             return 0;

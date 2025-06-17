@@ -1,4 +1,4 @@
-namespace TMS.Service.Enums;
+namespace TMS.Repository.Enums;
 
 public class Priority
 {
@@ -6,7 +6,6 @@ public class Priority
     {
         Low = 1,
         Medium = 2,
-        High = 3,
-        Urgent = 4
+        High = 3
     }
 }

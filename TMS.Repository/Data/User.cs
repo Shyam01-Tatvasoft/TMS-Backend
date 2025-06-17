@@ -39,5 +39,7 @@ public partial class User
 
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
+    public virtual ICollection<TaskAction> TaskActions { get; set; } = new List<TaskAction>();
+
     public virtual ICollection<TaskAssign> TaskAssigns { get; set; } = new List<TaskAssign>();
 }

@@ -27,6 +27,8 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<Task> Tasks { get; set; }
 
+    public virtual DbSet<TaskAction> TaskActions { get; set; }
+
     public virtual DbSet<TaskAssign> TaskAssigns { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
@@ -140,6 +142,32 @@ public partial class TmsContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Name).HasColumnName("name");
+        });
+
+        modelBuilder.Entity<TaskAction>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("task_action_pkey");
+
+            entity.ToTable("task_action");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.FkTaskId).HasColumnName("fk_task_id");
+            entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
+            entity.Property(e => e.SubmittedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("submitted_at");
+            entity.Property(e => e.SubmittedData)
+                .HasColumnType("jsonb")
+                .HasColumnName("submitted_data");
+
+            entity.HasOne(d => d.FkTask).WithMany(p => p.TaskActions)
+                .HasForeignKey(d => d.FkTaskId)
+                .HasConstraintName("task_action_fk_task_id_fkey");
+
+            entity.HasOne(d => d.FkUser).WithMany(p => p.TaskActions)
+                .HasForeignKey(d => d.FkUserId)
+                .HasConstraintName("task_action_fk_user_id_fkey");
         });
 
         modelBuilder.Entity<TaskAssign>(entity =>
