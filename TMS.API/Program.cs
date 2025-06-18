@@ -40,6 +40,7 @@ builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IHolidayService, HolidayService>();
+builder.Services.AddScoped<ITaskActionService, TaskActionService>();
 builder.Services.AddHttpClient<HolidayService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -48,6 +49,7 @@ builder.Services.AddScoped<ITimezoneRepository, TimezoneRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<ITaskAssignRepository,TaskAssignRepository >();
 builder.Services.AddScoped<INotificationRepository,NotificationRepository >();
+builder.Services.AddScoped<ITaskActionRepository,TaskActionRepository>();
 builder.Services.AddHttpClient<CountryRepository>();
 
 

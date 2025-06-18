@@ -80,17 +80,20 @@ public class TaskService : ITaskService
         return TaskAssignDto;
     }
 
-    public async Task<(int id, string message)> AddTaskAssignAsync(AddTaskDto task)
+    public async Task<(int id, string message)> AddTaskAssignAsync(AddTaskDto task,string role)
     {
         User? user = await _userRepository.GetByIdAsync((int)task.FkUserId!);
         if (user == null)
-            return (0, "User not found");
-
+            return (0, "User not found.");
+        if(role == "Admin" && task.Status.HasValue && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Pending && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Cancelled )
+        {
+            return (0, "Invalid status.");
+        }
 
         bool isHoliday = await _holidayService.IsHolidayAsync(user?.FkCountry?.IsoCode!, task.DueDate);
         if (isHoliday)
         {
-            return (0, $"Cannot assign task deadline {task.DueDate:yyyy-MM-dd} because it's a public holiday in {user?.FkCountry?.Name}.");
+            return (0, $"Please assign task on another day because it's a public holiday for {user?.FirstName + " " + user?.LastName}.");
         }
         TaskAssign newTask = new()
         {
@@ -123,10 +126,15 @@ public class TaskService : ITaskService
         {
             return (false, "Cannot change the status of a task that is in progress.");
         }
+        
+        if(role == "User" && task.Status.HasValue && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Pending && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.InProgress && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.OnHold)
+        {
+            return (false, "Invalid status.");
+        }
 
         existingTask.Description = task.Description;
         existingTask.TaskData = JsonSerializer.Serialize(task.TaskData);
-        existingTask.DueDate = task.DueDate;
+        existingTask.DueDate = existingTask.DueDate;
         existingTask.Status = task.Status;
         existingTask.Priority = task.Priority;
 
@@ -156,14 +164,5 @@ public class TaskService : ITaskService
         emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
 
         return emailBody;
-    }
-
-    public string GetDisplayName(Enum enumValue)
-    {
-        return enumValue.GetType()
-                        .GetMember(enumValue.ToString())
-                        .First()
-                        .GetCustomAttributes<DisplayAttribute>()?
-                        .FirstOrDefault()?.Name ?? enumValue.ToString();
     }
 }

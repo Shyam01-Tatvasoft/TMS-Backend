@@ -16,6 +16,8 @@ public class Status
         [Description("On Hold")]
         OnHold = 4,
         [Description("Cancelled")]
-        Cancelled = 5
+        Cancelled = 5,
+        [Description("Review")]
+        Review = 6
     }
 }

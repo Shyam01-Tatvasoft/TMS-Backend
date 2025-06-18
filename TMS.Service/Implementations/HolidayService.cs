@@ -40,7 +40,5 @@ public class HolidayService : IHolidayService
     private class HolidayDto
     {
         public DateTime Date { get; set; }
-        public string LocalName { get; set; }
-        public string Name { get; set; }
     }
 }
