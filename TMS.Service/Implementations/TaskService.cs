@@ -134,7 +134,7 @@ public class TaskService : ITaskService
 
         existingTask.Description = task.Description;
         existingTask.TaskData = JsonSerializer.Serialize(task.TaskData);
-        existingTask.DueDate = existingTask.DueDate;
+        existingTask.DueDate = task.DueDate;
         existingTask.Status = task.Status;
         existingTask.Priority = task.Priority;
 

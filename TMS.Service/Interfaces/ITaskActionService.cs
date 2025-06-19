@@ -6,7 +6,8 @@ namespace TMS.Service.Interfaces;
 public interface ITaskActionService
 {
     public Task<List<TaskAction>> GetAllTaskActionsAsync();
-    public Task<TaskAction?> GetTaskActionByIdAsync(int id);
+    public Task<TaskActionDto?> GetTaskActionByIdAsync(int id);
     public Task<int> AddTaskActionAsync(EmailTaskDto emailTask);
     public Task<int> AddUploadTaskAsync(UploadFileTaskDto dto);
+    public Task<List<TaskFileData>?> GetTaskFileData(int id);
 }

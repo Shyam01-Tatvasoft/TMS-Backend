@@ -27,9 +27,24 @@ public class TaskActionService : ITaskActionService
         return await _taskActionRepository.GetAllTaskActionsAsync();
     }
 
-    public async Task<TaskAction?> GetTaskActionByIdAsync(int id)
+    public async Task<TaskActionDto?> GetTaskActionByIdAsync(int id)
     {
-        return await _taskActionRepository.GetTaskActionByIdAsync(id);
+        TaskAction? taskAction = await _taskActionRepository.GetTaskActionByIdAsync(id);
+        if (taskAction == null)
+            return null;
+        TaskActionDto taskActionDto = new()
+        {
+            Id = taskAction.Id,
+            FkTaskId = taskAction.FkTaskId,
+            FkUserId = taskAction.FkUserId,
+            SubmittedAt = taskAction.SubmittedAt,
+            SubmittedData = JsonSerializer.Deserialize<JsonElement>(taskAction.SubmittedData!),
+            UserName = taskAction.FkUser != null ? taskAction.FkUser.FirstName + " " + taskAction.FkUser.LastName : string.Empty,
+            TaskName = taskAction.FkTask.FkTask.Name ?? string.Empty,
+            SubTaskName = taskAction?.FkTask?.FkSubtask?.Name ?? string.Empty
+        };
+
+        return taskActionDto;
     }
 
     public async Task<int> AddTaskActionAsync(EmailTaskDto emailTask)
@@ -48,7 +63,7 @@ public class TaskActionService : ITaskActionService
             SubmittedAt = DateTime.Now,
             SubmittedData = JsonSerializer.Serialize(emailInfo)
         };
-        
+
         string emailBody = await GetTaskEmailBody("WelcomeMailTemplate");
         _emailService.SendMail(emailTask.Email, emailTask.Subject, emailBody);
         await _taskActionRepository.AddTaskActionAsync(taskAction);
@@ -62,7 +77,7 @@ public class TaskActionService : ITaskActionService
 
     public async Task<int> AddUploadTaskAsync(UploadFileTaskDto dto)
     {
-        
+
         var files = dto.Files;
         var taskId = dto.FkTaskId;
         var userId = dto.FkUserId;
@@ -112,9 +127,9 @@ public class TaskActionService : ITaskActionService
         TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(dto.FkTaskId);
         task.Status = (int?)Status.StatusEnum.Review;
         await _taskAssignRepository.UpdateTaskAssignAsync(task);
-        
+
         return taskAction.Id;
-        
+
     }
 
     public async Task<string> GetTaskEmailBody(string templateName = "WelcomeMailTemplate")
@@ -129,5 +144,16 @@ public class TaskActionService : ITaskActionService
         string emailBody = System.IO.File.ReadAllText(templatePath);
 
         return emailBody;
+    }
+
+
+    public async Task<List<TaskFileData>?> GetTaskFileData(int id)
+    {
+        TaskActionDto? taskAction = await GetTaskActionByIdAsync(id);
+        if (taskAction == null)
+            return null;
+
+        var submittedData = JsonSerializer.Deserialize<List<TaskFileData>>((JsonElement)taskAction.SubmittedData!);
+        return submittedData;
     }
 }

@@ -10,7 +10,9 @@ public class NotificationDto
 
     public string? TaskType { get; set; }
 
-    public string TaskDescription { get; set; }
-    
+    public string TaskDescription { get; set; } = string.Empty;
+
+    public string? Priority { get; set; } = string.Empty;
+
     public bool? IsRead { get; set; }
 }

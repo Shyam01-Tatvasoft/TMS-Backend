@@ -37,7 +37,8 @@ public class TaskAssignRepository : ITaskAssignRepository
                 {
                     "2" => query.OrderBy(t => t.FkUser.FirstName).ThenBy(t => t.FkUser.LastName),
                     "4" => query.OrderBy(t => t.DueDate),
-                    _ => query.OrderBy(t => t.DueDate)
+                    "5" => query.OrderBy(t => t.Status.ToString()),
+                    _ => query.OrderBy(t => t.Id)
                 };
             }
             else
@@ -46,13 +47,14 @@ public class TaskAssignRepository : ITaskAssignRepository
                 {
                     "2" => query.OrderByDescending(t => t.FkUser.FirstName).ThenByDescending(t => t.FkUser.LastName),
                     "4" => query.OrderByDescending(t => t.DueDate),
-                    _ => query.OrderByDescending(t => t.DueDate)
+                    "5" => query.OrderBy(t => t.Status.ToString()),
+                    _ => query.OrderByDescending(t => t.Id)
                 };
             }
         }
         else
         {
-            query = query.OrderByDescending(t => t.DueDate);
+            query = query.OrderByDescending(t => t.Id);
         }
         if (!string.IsNullOrEmpty(search))
         {
@@ -60,6 +62,7 @@ public class TaskAssignRepository : ITaskAssignRepository
             query = query.Where(t =>
                 t.FkTask.Name.ToLower().Contains(search) ||
                 t.Description.Contains(search) ||
+                (t.FkUser.FirstName + " " + t.FkUser.LastName).ToLower().Contains(search) ||
                 t.FkUser.FirstName.ToLower().Contains(search) ||
                 t.FkUser.LastName.ToLower().Contains(search));
         }
@@ -75,10 +78,16 @@ public class TaskAssignRepository : ITaskAssignRepository
                 Description = taskAssign.Description,
                 DueDate = taskAssign.DueDate,
                 Status = ((Status.StatusEnum)taskAssign.Status).ToDescription(),
-                Priority =((Priority.PriorityEnum)taskAssign.Priority.Value).ToString(),
+                Priority = ((Priority.PriorityEnum)taskAssign.Priority.Value).ToString(),
                 CreatedAt = taskAssign.CreatedAt,
                 TaskName = taskAssign.FkTask.Name ?? string.Empty,
-                SubTaskName = taskAssign.FkSubtask.Name ?? string.Empty
+                SubTaskName = taskAssign.FkSubtask.Name ?? string.Empty,
+                TaskActionId = ((Status.StatusEnum?)taskAssign.Status == Status.StatusEnum.Review || 
+                (Status.StatusEnum)taskAssign.Status == Status.StatusEnum.Completed) 
+                ? _context.TaskActions
+                    .Where(ta => ta.FkTaskId == taskAssign.Id)
+                    .Select(ta => ta.Id)
+                    .FirstOrDefault() : -1,
             })
             .ToListAsync();
 
@@ -86,7 +95,7 @@ public class TaskAssignRepository : ITaskAssignRepository
 
         return (tasks, totalCount);
     }
-    
+
     public async Task<TaskAssign?> GetTaskAssignAsync(int id)
     {
         return await _context.TaskAssigns.Where(t => t.Id == id)

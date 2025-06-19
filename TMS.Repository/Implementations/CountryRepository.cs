@@ -19,8 +19,7 @@ public class CountryRepository: ICountryRepository
 
     public async Task<List<Country>> GetCountries()
     {
-        List<Country> countries = await _context.Countries
-            // .Include(c => c.Timezones)
+        List<Country> countries = await _context.Countries.OrderBy(c => c.Name)
             .ToListAsync();
         return countries;
     }

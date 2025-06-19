@@ -20,7 +20,12 @@ public class TaskActionRepository : ITaskActionRepository
 
     public async Task<TaskAction?> GetTaskActionByIdAsync(int id)
     {
-        return await _context.TaskActions.FindAsync(id);
+        return await _context.TaskActions.Where(t => t.Id == id)
+            .Include(t => t.FkTask)
+            .Include(t => t.FkTask.FkTask)
+            .Include(t => t.FkTask.FkSubtask)
+            .Include(t => t.FkUser)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<TaskAction> AddTaskActionAsync(TaskAction taskAction)

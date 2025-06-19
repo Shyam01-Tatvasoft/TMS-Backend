@@ -1,5 +1,6 @@
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
+using TMS.Repository.Enums;
 using TMS.Repository.Interfaces;
 using TMS.Service.Interfaces;
 
@@ -28,6 +29,7 @@ public class NotificationService : INotificationService
                 FkUserId = n.FkUserId,
                 TaskType = n.FkTask.FkTask.Name,
                 TaskDescription = n.FkTask.Description,
+                Priority = n.FkTask.Priority.HasValue ? ((Priority.PriorityEnum)n.FkTask.Priority.Value).ToString() : "Unknown",
                 IsRead = n.IsRead
             });
         });
