@@ -87,7 +87,7 @@ public class TaskAssignRepository : ITaskAssignRepository
                 ? _context.TaskActions
                     .Where(ta => ta.FkTaskId == taskAssign.Id)
                     .Select(ta => ta.Id)
-                    .FirstOrDefault() : -1,
+                    .FirstOrDefault() : 0,
             })
             .ToListAsync();
 

@@ -11,4 +11,6 @@ public interface ITaskService
     public Task<(bool success, string message)> UpdateTaskAssignAsync(EditTaskDto task, string role);
     public Task<List<SubTaskDto>> GetSubTasksByTaskIdAsync(int id);
     public Task<List<TaskDto>> GetAllTasksAsync();
+    public Task<TaskAssign> ApproveTask(int id);
+    public Task<TaskAssign> ReassignTask(ReassignTaskDto dto);
 }

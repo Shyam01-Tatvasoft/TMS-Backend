@@ -6,5 +6,6 @@ public class UploadFileTaskDto
 {
     public int FkTaskId { get; set; }
     public int FkUserId { get; set; }
+    public int? TaskActionId { get; set; }
     public List<IFormFile> Files { get; set; }
 }

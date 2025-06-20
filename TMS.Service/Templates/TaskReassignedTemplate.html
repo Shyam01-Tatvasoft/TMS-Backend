@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Notification</title>
+  <style>
+    .container {
+      width: 90%;
+      max-width: 600px;
+      margin: 0 auto;
+      font-family: Arial, sans-serif;
+    }
+
+    .header {
+      background-color: #005b9c;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .header img {
+      height: 40px;
+      margin-right: 15px;
+    }
+
+    .content {
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+
+    .content p {
+      margin: 5px 0;
+    }
+
+    .label {
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Task Management System</h2>
+    </div>
+    <div class="content">
+      <p>Hello<b>{{UserName}}</b>,</p>
+      <p>You have been reassigned a task by admin. Below are the task details:</p>
+      <p><span class="label">Task Type:</span> {{TaskType}}</p>
+      <p><span class="label">Sub Task:</span> {{SubTask}}</p>
+      <p><span class="label">Priority:</span> {{Priority}}</p>
+      <p><span class="label">Current Status:</span> {{Status}}</p>
+      <p><span class="label">Description:</span> {{Description}}</p>
+      <p><span class="label">Due Date:</span> {{DueDate}}</p>
+      <br />
+      <p>
+        Please take the necessary actions on that and approve it if all the details are proper.
+      </p>
+      <p>Regards,</p>
+      <p><b>Task Management System</b></p>
+    </div>
+  </div>
+</body>
+
+</html>

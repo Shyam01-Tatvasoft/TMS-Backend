@@ -30,7 +30,9 @@ public class NotificationService : INotificationService
                 TaskType = n.FkTask.FkTask.Name,
                 TaskDescription = n.FkTask.Description,
                 Priority = n.FkTask.Priority.HasValue ? ((Priority.PriorityEnum)n.FkTask.Priority.Value).ToString() : "Unknown",
-                IsRead = n.IsRead
+                Status = n.FkTask.Status.HasValue ? ((Status.StatusEnum)n.FkTask.Status.Value).ToDescription() : "Unknown",
+                IsRead = n.IsRead,
+                UserName = n.FkTask.FkUser != null ? n.FkTask.FkUser.FirstName + " " + n.FkTask.FkUser.LastName : string.Empty
             });
         });
 

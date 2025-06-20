@@ -14,12 +14,16 @@ public class TaskActionService : ITaskActionService
     private readonly ITaskActionRepository _taskActionRepository;
     private readonly IEmailService _emailService;
     private readonly ITaskAssignRepository _taskAssignRepository;
+    private readonly INotificationService _notificationService;
+    private readonly IUserService _userService;
 
-    public TaskActionService(ITaskActionRepository taskActionRepository, IEmailService emailService, ITaskAssignRepository taskAssignRepository)
+    public TaskActionService(ITaskActionRepository taskActionRepository, IEmailService emailService, ITaskAssignRepository taskAssignRepository, INotificationService notificationRepository, IUserService userService)
     {
         _taskActionRepository = taskActionRepository;
         _emailService = emailService;
         _taskAssignRepository = taskAssignRepository;
+        _notificationService = notificationRepository;
+        _userService = userService;
     }
 
     public async Task<List<TaskAction>> GetAllTaskActionsAsync()
@@ -41,7 +45,8 @@ public class TaskActionService : ITaskActionService
             SubmittedData = JsonSerializer.Deserialize<JsonElement>(taskAction.SubmittedData!),
             UserName = taskAction.FkUser != null ? taskAction.FkUser.FirstName + " " + taskAction.FkUser.LastName : string.Empty,
             TaskName = taskAction.FkTask.FkTask.Name ?? string.Empty,
-            SubTaskName = taskAction?.FkTask?.FkSubtask?.Name ?? string.Empty
+            SubTaskName = taskAction?.FkTask?.FkSubtask?.Name ?? string.Empty,
+            Status = taskAction?.FkUser != null ? ((Status.StatusEnum)taskAction?.FkTask?.Status).ToDescription() : string.Empty
         };
 
         return taskActionDto;
@@ -64,14 +69,32 @@ public class TaskActionService : ITaskActionService
             SubmittedData = JsonSerializer.Serialize(emailInfo)
         };
 
+        // perform email send task
         string emailBody = await GetTaskEmailBody("WelcomeMailTemplate");
         _emailService.SendMail(emailTask.Email, emailTask.Subject, emailBody);
-        await _taskActionRepository.AddTaskActionAsync(taskAction);
+        if (emailTask.TaskActionId != null && emailTask.TaskActionId != 0)
+        {
+            // Perform update when Task is reassigned
+            taskAction.Id = (int)emailTask.TaskActionId!;
+            await _taskActionRepository.UpdateTaskActionAsync(taskAction);
+        }
+        else
+        {
+            await _taskActionRepository.AddTaskActionAsync(taskAction);
+        }
+
 
         TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(emailTask.FkTaskId);
         task.Status = (int?)Status.StatusEnum.Review;
 
         await _taskAssignRepository.UpdateTaskAssignAsync(task);
+
+        // send mail to admin
+        string emailBodyAdmin = await GetTaskEmailBody(emailTask.FkTaskId, "TaskPerformedTemplate");
+        _emailService.SendMail("admin@gmail.com", "Task Performed", emailBodyAdmin);
+
+        //send notification to admin
+        await _notificationService.AddNotification(1, emailTask.FkTaskId);
         return taskAction.Id;
     }
 
@@ -81,7 +104,7 @@ public class TaskActionService : ITaskActionService
         var files = dto.Files;
         var taskId = dto.FkTaskId;
         var userId = dto.FkUserId;
-
+        UserDto? user = await _userService.GetUserById(userId);
         var uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedEncrypted");
         if (!Directory.Exists(uploadFolder))
             Directory.CreateDirectory(uploadFolder);
@@ -98,8 +121,12 @@ public class TaskActionService : ITaskActionService
             using (var fs = new FileStream(encryptedPath, FileMode.Create))
             using (var aes = Aes.Create())
             {
-                aes.Key = Encoding.UTF8.GetBytes("12345678901234567890123456789012"); // 32 bytes
-                aes.IV = Encoding.UTF8.GetBytes("1234567890123456"); // 16 bytes
+                // string secret_iv = user.FirstName.Substring(0, 1) + user.FirstName.Substring(user.FirstName.Length - 2) + user.LastName.Substring(0, 1) + user.Phone;
+                // string secret_key = secret_iv + secret_iv;
+                // aes.Key = Encoding.UTF8.GetBytes(secret_key);
+                // aes.IV = Encoding.UTF8.GetBytes(secret_iv);
+                aes.Key = Encoding.UTF8.GetBytes("12345678901234567890123456789012");
+                aes.IV = Encoding.UTF8.GetBytes("1234567890123456");
 
                 using var cryptoStream = new CryptoStream(fs, aes.CreateEncryptor(), CryptoStreamMode.Write);
                 await file.CopyToAsync(cryptoStream);
@@ -121,12 +148,27 @@ public class TaskActionService : ITaskActionService
             SubmittedAt = DateTime.Now,
             SubmittedData = JsonSerializer.Serialize(submittedDataList)
         };
-
-        await _taskActionRepository.AddTaskActionAsync(taskAction);
+        if (dto.TaskActionId != null && dto.TaskActionId != 0)
+        {
+            // Perform update when Task is reassigned
+            taskAction.Id = (int)dto.TaskActionId!;
+            await _taskActionRepository.UpdateTaskActionAsync(taskAction);
+        }
+        else
+        {
+            await _taskActionRepository.AddTaskActionAsync(taskAction);
+        }
 
         TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(dto.FkTaskId);
         task.Status = (int?)Status.StatusEnum.Review;
         await _taskAssignRepository.UpdateTaskAssignAsync(task);
+
+        // send mail to admin
+        string emailBodyAdmin = await GetTaskEmailBody(dto.FkTaskId, "TaskPerformedTemplate");
+        _emailService.SendMail("admin@gmail.com", "Task Performed", emailBodyAdmin);
+
+        //send notification to admin
+        await _notificationService.AddNotification(1, dto.FkTaskId);
 
         return taskAction.Id;
 
@@ -142,6 +184,29 @@ public class TaskActionService : ITaskActionService
         }
 
         string emailBody = System.IO.File.ReadAllText(templatePath);
+
+        return emailBody;
+    }
+
+    public async Task<string> GetTaskEmailBody(int id, string templateName)
+    {
+        TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(id);
+        string templatePath = $"d:/TMS/TMS.Service/Templates/{templateName}.html";
+
+        if (!System.IO.File.Exists(templatePath))
+        {
+            return "<p>Email template not found</p>";
+        }
+
+        string emailBody = System.IO.File.ReadAllText(templatePath);
+
+        emailBody = emailBody.Replace("{{UserName}}", task?.FkUser.FirstName + " " + task.FkUser.LastName ?? "User");
+        emailBody = emailBody.Replace("{{TaskType}}", task.FkTask?.Name ?? "-");
+        emailBody = emailBody.Replace("{{SubTask}}", task.FkSubtask?.Name ?? "-");
+        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority.Value).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status.Value).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{DueDate}}", task.DueDate.ToString("dd MMM yyyy"));
+        emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
 
         return emailBody;
     }

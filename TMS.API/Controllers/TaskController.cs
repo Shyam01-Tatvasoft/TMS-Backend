@@ -2,7 +2,9 @@ using System.Net;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging.Abstractions;
 using TMS.API.Hubs;
+using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
 
@@ -171,6 +173,82 @@ public class TaskController : ControllerBase
             _response.IsSuccess = false;
             _response.ErrorMessage = new List<string> { ex.Message };
             return StatusCode(500, _response);
+        }
+    }
+
+    [HttpPost("approve/{id}")]
+    [ProducesResponseType(typeof(TaskActionDto), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> ApproveTask(int id)
+    {
+        try
+        {
+            var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+            if (string.IsNullOrEmpty(authToken))
+            {
+                return Unauthorized();
+            }
+            var (email, role, userId) = _jwtService.ValidateToken(authToken);
+            if (email == null || role == null || userId == null)
+                return Unauthorized();
+            if (role != "Admin")
+            {
+                return Forbid("Only Admin can approve tasks.");
+            }
+
+            TaskAssign result = await _taskService.ApproveTask(id);
+            if(result == null)
+            {
+                return BadRequest("Task approval failed.");
+            }
+            string? taskUserId = result.FkUserId.ToString();
+            string message = "Your Task is Approved !";
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId , message);
+            return Ok("Task approved successfully.");
+        }
+        catch (System.Exception)
+        {
+            return StatusCode(500, "An error occurred while approving the task.");
+        }
+    }
+
+    [HttpPost("reassign")]
+    [ProducesResponseType(typeof(TaskActionDto), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> ReassignTask([FromForm] ReassignTaskDto dto)
+    {
+        try
+        {
+            var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+            if (string.IsNullOrEmpty(authToken))
+            {
+                return Unauthorized();
+            }
+            var (email, role, userId) = _jwtService.ValidateToken(authToken);
+            if (email == null || role == null || userId == null)
+                return Unauthorized();
+            if (role != "Admin")
+            {
+                return Forbid("Only Admin can reassign tasks.");
+            }
+
+            TaskAssign result = await _taskService.ReassignTask(dto);
+            if(result == null)
+            {
+                return BadRequest("Task reassignment failed.");
+            }
+            string? taskUserId = result.FkUserId.ToString();
+            string message = "Your Task is Reassigned !";
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId , message);
+            return Ok("Task reassigned successfully.");
+        }
+        catch (System.Exception)
+        {
+            return StatusCode(500, "An error occurred while reassigning the task.");
         }
     }
 

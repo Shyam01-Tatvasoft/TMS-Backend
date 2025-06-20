@@ -34,4 +34,18 @@ public class TaskActionRepository : ITaskActionRepository
         await _context.SaveChangesAsync();
         return taskAction;
     }
+
+    public async Task<TaskAction?> GetTaskActionByTaskIdAsync(int taskId)
+    {
+        return await _context.TaskActions
+            .Where(t => t.FkTaskId == taskId)
+            .Include(t => t.FkUser)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<int> UpdateTaskActionAsync(TaskAction taskAction)
+    {
+        _context.TaskActions.Update(taskAction);
+        return await _context.SaveChangesAsync();
+    }
 }

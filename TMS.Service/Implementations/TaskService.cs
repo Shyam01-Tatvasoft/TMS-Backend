@@ -17,8 +17,9 @@ public class TaskService : ITaskService
     private readonly INotificationService _notificationService;
     private readonly IHolidayService _holidayService;
     private readonly IUserRepository _userRepository;
+    private readonly ITaskActionRepository _taskActionRepository;
 
-    public TaskService(ITaskAssignRepository taskAssignRepository, ITaskRepository taskRepository, IEmailService emailService, INotificationService notificationService, IHolidayService holidayService, IUserRepository userRepository)
+    public TaskService(ITaskAssignRepository taskAssignRepository, ITaskRepository taskRepository, IEmailService emailService, INotificationService notificationService, IHolidayService holidayService, IUserRepository userRepository, ITaskActionRepository taskActionRepository)
     {
         _taskAssignRepository = taskAssignRepository;
         _taskRepository = taskRepository;
@@ -26,6 +27,7 @@ public class TaskService : ITaskService
         _notificationService = notificationService;
         _holidayService = holidayService;
         _userRepository = userRepository;
+        _taskActionRepository = taskActionRepository;
     }
 
     public async Task<List<TaskDto>> GetAllTasksAsync()
@@ -63,6 +65,7 @@ public class TaskService : ITaskService
         UpdateTaskDto TaskAssignDto = new();
         if (taskAssign != null)
         {
+            TaskAction? taskAction = await _taskActionRepository.GetTaskActionByTaskIdAsync(taskAssign.Id);
             TaskAssignDto = new()
             {
                 Id = taskAssign.Id,
@@ -74,6 +77,7 @@ public class TaskService : ITaskService
                 Priority = taskAssign.Priority,
                 DueDate = taskAssign.DueDate,
                 Description = taskAssign.Description,
+                FkTaskActionId = taskAction != null ? taskAction.Id : 0,
             };
         }
 
@@ -164,5 +168,43 @@ public class TaskService : ITaskService
         emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
 
         return emailBody;
+    }
+
+    public async Task<TaskAssign?> ApproveTask(int id)
+    {
+        TaskAssign? taskAssign = await _taskAssignRepository.GetTaskAssignAsync(id);
+        if (taskAssign == null)
+        {
+            return null;
+        }
+
+        taskAssign.Status = (int)Status.StatusEnum.Completed;
+        await _taskAssignRepository.UpdateTaskAssignAsync(taskAssign);
+        await _notificationService.AddNotification((int)taskAssign.FkUserId, taskAssign.Id);
+        string emailBody = await GetTaskEmailBody(taskAssign.Id);
+        _emailService.SendMail(taskAssign.FkUser.Email, "Task Approved", emailBody);
+        return taskAssign;
+    }
+
+    public async Task<TaskAssign> ReassignTask(ReassignTaskDto dto)
+    {
+        TaskAssign? taskAssign = await _taskAssignRepository.GetTaskAssignAsync(dto.TaskId);
+        if (taskAssign == null)
+        {
+            throw new Exception("Task not found.");
+        }
+
+        taskAssign.Description = dto.Comments;
+        taskAssign.Status = (int)Status.StatusEnum.Pending;
+        
+        await _taskAssignRepository.UpdateTaskAssignAsync(taskAssign);
+        
+        // Reassign task email
+        string emailBody = await GetTaskEmailBody(taskAssign.Id, "TaskReassignedTemplate");
+        _emailService.SendMail(taskAssign.FkUser.Email, "Task Reassigned", emailBody);
+
+        // Notify user
+        await _notificationService.AddNotification((int)taskAssign.FkUserId, taskAssign.Id);
+        return taskAssign;
     }
 }

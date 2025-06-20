@@ -18,7 +18,8 @@ public class NotificationRepository : INotificationRepository
         return await _context.Notifications
             .Where(n => n.FkUserId == userId && n.IsRead == false)
             .Include(n => n.FkTask)
-            .ThenInclude(n => n.FkTask)
+            .Include(n => n.FkTask.FkUser)
+            .Include(n => n.FkTask.FkTask)
             .ToListAsync();
     }
 

@@ -20,4 +20,6 @@ public class TaskActionDto
 
     public string? SubTaskName { get; set; }
 
+    public string Status { get; set; } = string.Empty;
+
 }

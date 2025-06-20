@@ -8,6 +8,7 @@ public class EmailTaskDto
     public int FkTaskId { get; set; }
     [Required]
     public int FkUserId { get; set; }
+    public int? TaskActionId { get; set; }
     [Required]
     [EmailAddress]
     public string Email { get; set; } = string.Empty;

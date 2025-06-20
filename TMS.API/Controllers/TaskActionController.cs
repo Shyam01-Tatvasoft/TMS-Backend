@@ -18,12 +18,14 @@ public class TaskActionController : ControllerBase
     private readonly ITaskActionService _taskActionService;
     private readonly IJWTService _jwtService;
     private readonly IHubContext<NotificationHub> _hubContext;
+    private readonly IUserService _userService;
 
-    public TaskActionController(ITaskActionService taskActionService, IJWTService jwtService, IHubContext<NotificationHub> hubContext)
+    public TaskActionController(ITaskActionService taskActionService, IJWTService jwtService, IHubContext<NotificationHub> hubContext, IUserService userService)
     {
         _jwtService = jwtService;
         _taskActionService = taskActionService;
         _hubContext = hubContext;
+        _userService = userService;
     }
 
     [HttpPost("send-email")]
@@ -44,7 +46,7 @@ public class TaskActionController : ControllerBase
             {
                 return StatusCode(500, "Failed to add task action.");
             }
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", 1 , "You Got");
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", 1, "User Performed an action.");
             return Ok(taskAction);
         }
         catch (System.Exception)
@@ -71,7 +73,7 @@ public class TaskActionController : ControllerBase
             {
                 return StatusCode(500, "Failed to add task action.");
             }
-
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", 1, "User Performed an action.");
             return Ok(taskAction);
         }
         catch (System.Exception)
@@ -130,8 +132,14 @@ public class TaskActionController : ControllerBase
         using (var ms = new MemoryStream())
         {
             using var aes = Aes.Create();
-            aes.Key = Encoding.UTF8.GetBytes("12345678901234567890123456789012"); // 32 bytes
-            aes.IV = Encoding.UTF8.GetBytes("1234567890123456"); // 16 bytes
+            // UserDto? user = await _userService.GetUserById(int.Parse(userId));
+            // string secret_iv = user.FirstName.Substring(0, 1) + user.FirstName.Substring(user.FirstName.Length - 2) + user.LastName.Substring(0, 1) + user.Phone;
+            // string secret_key = secret_iv + secret_iv;
+            
+            // aes.Key = Encoding.UTF8.GetBytes(secret_key); 
+            // aes.IV = Encoding.UTF8.GetBytes(secret_iv); 
+            aes.Key = Encoding.UTF8.GetBytes("12345678901234567890123456789012");
+            aes.IV = Encoding.UTF8.GetBytes("1234567890123456");
 
             using var decryptor = aes.CreateDecryptor();
             using var cryptoStream = new CryptoStream(ms, decryptor, CryptoStreamMode.Write);
@@ -145,11 +153,11 @@ public class TaskActionController : ControllerBase
     }
 
 
-    [HttpGet("download-zip/{id}")]
-    public async Task<IActionResult> DownloadFilesAsZip(int id)
+    [HttpGet("download-zip/{id}/{userId}")]
+    public async Task<IActionResult> DownloadFilesAsZip(int id,string userId)
     {
-       List<TaskFileData>? submittedData = await _taskActionService.GetTaskFileData(id);
-        if(submittedData == null)
+        List<TaskFileData>? submittedData = await _taskActionService.GetTaskFileData(id);
+        if (submittedData == null)
             return NotFound("No file Found");
 
         var tempDir = Path.Combine(Path.GetTempPath(), $"Task_{id}");
@@ -158,7 +166,11 @@ public class TaskActionController : ControllerBase
         Directory.CreateDirectory(tempDir);
 
         string uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "UploadedEncrypted");
-
+        
+        // UserDto? user = await _userService.GetUserById(int.Parse(userId));
+        // string secret_iv = user.FirstName.Substring(0, 1) + user.FirstName.Substring(user.FirstName.Length - 2) + user.LastName.Substring(0, 1) + user.Phone;
+        // string secret_key = secret_iv + secret_iv;
+        
         foreach (var file in submittedData!)
         {
             string sourcePath = Path.Combine(uploadPath, file.StoredFileName);
