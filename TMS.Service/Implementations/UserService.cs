@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using AutoMapper;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
+using TMS.Repository.Implementations;
 using TMS.Repository.Interfaces;
 using TMS.Service.Interfaces;
 
@@ -11,10 +13,12 @@ namespace TMS.Service.Implementations;
 public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
+    private readonly ITaskActionRepository _taskActionRepository;
     // private readonly IMapper _mapper;
-    public UserService(IUserRepository userRepository)
+    public UserService(IUserRepository userRepository, ITaskActionRepository taskActionRepository)
     {
         _userRepository = userRepository;
+        _taskActionRepository = taskActionRepository;
         // _mapper = mapper;
     }
 
@@ -45,9 +49,9 @@ public class UserService : IUserService
         // return _mapper.Map<List<UserDto>>(users);
     }
 
-    public async Task<(List<UserDto>,int count)> GetUsers(int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
+    public async Task<(List<UserDto>, int count)> GetUsers(int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
     {
-         return await _userRepository.GetUsers(skip, take, search, sorting, sortDirection);
+        return await _userRepository.GetUsers(skip, take, search, sorting, sortDirection);
     }
 
     public async Task<UserDto?> GetUserByEmail(string? email)
@@ -100,8 +104,8 @@ public class UserService : IUserService
         User? existingUser = await _userRepository.GetByUsernameAsync(user.Username);
         if (existingUser != null) return (false, "Username already exists.");
         var existing = await _userRepository.GetByEmailAsync(user.Email);
-        if (existing != null) return (false,"Email already registered.");
-        
+        if (existing != null) return (false, "Email already registered.");
+
 
         User newUser = new User
         {
@@ -127,11 +131,26 @@ public class UserService : IUserService
         {
             return (false, "Username not available.");
         }
-        User existingUserByEmail = await _userRepository.GetByEmailAsync(user.Email);
+        User? existingUserByEmail = await _userRepository.GetByEmailAsync(user.Email);
+
+        string oldCombined = existingUserByEmail?.FirstName.Substring(0, 2) +
+            existingUserByEmail?.LastName.Substring(existingUserByEmail.LastName.Length - 2) +
+            existingUserByEmail?.Phone?.Substring(0, 1) +
+            existingUserByEmail?.Email.Substring(0, 3);
+
+        string newCombined = user?.FirstName.Substring(0, 2) +
+            user?.LastName.Substring(user.LastName.Length - 2) +
+            user?.Phone?.Substring(0, 1) +
+            user?.Email.Substring(0, 3);
+
+        // bool isDocumentUpdated = await UpdateUserDocuments(oldCombined, newCombined, (int)user?.Id!);
+
+        // if (!isDocumentUpdated)
+        //     return (false, "Error while update the user.");
 
         // add profile image handling
         string ProfileImagePath = null;
-        if (user.ProfileImage != null && user.ProfileImage.Length > 0)
+        if (user?.ProfileImage != null && user.ProfileImage.Length > 0)
         {
             var folderPath = "D:/TMSFrontend/assets/images/ProfileImages";
             if (!Directory.Exists(folderPath))
@@ -158,6 +177,81 @@ public class UserService : IUserService
         return response ? (true, "User updated successfully.") : (false, "User Not Found.");
     }
 
+
+    public async Task<bool> UpdateUserDocuments(string oldCombined, string newCombined, int id)
+    {
+        byte[] oldKey = SHA256.HashData(Encoding.UTF8.GetBytes(oldCombined));
+        byte[] oldIV = MD5.HashData(Encoding.UTF8.GetBytes(oldCombined));
+
+        byte[] newKey = SHA256.HashData(Encoding.UTF8.GetBytes(newCombined));
+        byte[] newIV = MD5.HashData(Encoding.UTF8.GetBytes(newCombined));
+
+        List<TaskAction>? userTaskActions = await _taskActionRepository.GetTaskActionByUserIdAsync(id);
+        var uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedEncrypted");
+        if (!Directory.Exists(uploadFolder))
+            Directory.CreateDirectory(uploadFolder);
+        if(userTaskActions == null)
+            return true;
+
+        foreach (var action in userTaskActions)
+        {
+            if (action?.FkTask?.FkTaskId != 2)
+                continue;
+            var submittedDataList = new List<object>();
+            var submittedData = JsonSerializer.Deserialize<List<TaskFileMetadata>>(action.SubmittedData!);
+
+            foreach (var fileMeta in submittedData!)
+            {
+                var filePath = Path.Combine(uploadFolder, fileMeta.StoredFileName);
+                var tempPath = filePath + ".tmp";
+                // decrypt
+                byte[] decryptedContent;
+                using (var inputStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                using (var aes = Aes.Create())
+                {
+                    aes.Key = oldKey;
+                    aes.IV = oldIV;
+                    using var cryptoStream = new CryptoStream(inputStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
+                    using var ms = new MemoryStream();
+                    await cryptoStream.CopyToAsync(ms);
+                    decryptedContent = ms.ToArray();
+                }
+                
+                //encrypt
+                using (var fs = new FileStream(filePath, FileMode.Create))
+                using (var aes = Aes.Create())
+                {
+                    aes.Key = newKey;
+                    aes.IV = newIV;
+                    using var cryptoStream = new CryptoStream(fs, aes.CreateEncryptor(), CryptoStreamMode.Write);
+                    await cryptoStream.WriteAsync(decryptedContent, 0, decryptedContent.Length);
+                }
+                File.Delete(filePath);
+                
+                File.Move(tempPath, filePath);
+
+                submittedDataList.Add(new
+                {
+                    OriginalFileName = fileMeta.OriginalFileName,
+                    StoredFileName = fileMeta.StoredFileName,
+                    Size = fileMeta.Size,
+                    UploadedAt = fileMeta.UploadedAt
+                });
+            }
+
+            action.SubmittedData = JsonSerializer.Serialize(submittedDataList);
+            await _taskActionRepository.UpdateTaskActionAsync(action);
+        }
+        return true;
+    }
+
+    public class TaskFileMetadata
+    {
+        public string OriginalFileName { get; set; }
+        public string StoredFileName { get; set; }
+        public long Size { get; set; }
+        public DateTime UploadedAt { get; set; }
+    }
 
     public async Task<(bool success, string message)> DeleteUser(int id)
     {

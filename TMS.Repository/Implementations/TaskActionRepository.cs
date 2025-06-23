@@ -43,6 +43,16 @@ public class TaskActionRepository : ITaskActionRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<List<TaskAction>?> GetTaskActionByUserIdAsync(int id)
+    {
+        return await _context.TaskActions.Where(t => t.FkUserId == id)
+            .Include(t => t.FkTask)
+            .Include(t => t.FkTask.FkTask)
+            .Include(t => t.FkTask.FkSubtask)
+            .Include(t => t.FkUser)
+            .ToListAsync();
+    }
+
     public async Task<int> UpdateTaskActionAsync(TaskAction taskAction)
     {
         _context.TaskActions.Update(taskAction);

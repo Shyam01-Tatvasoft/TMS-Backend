@@ -100,14 +100,23 @@ public class TaskActionService : ITaskActionService
 
     public async Task<int> AddUploadTaskAsync(UploadFileTaskDto dto)
     {
-
         var files = dto.Files;
         var taskId = dto.FkTaskId;
         var userId = dto.FkUserId;
         UserDto? user = await _userService.GetUserById(userId);
+
         var uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedEncrypted");
         if (!Directory.Exists(uploadFolder))
             Directory.CreateDirectory(uploadFolder);
+
+        // Generate Key and IV based on user details
+        string combinedUserInfo = 
+            user?.FirstName.Substring(0, 2) +
+            user?.LastName.Substring(user.LastName.Length - 2) +
+            user?.Phone?.Substring(0, 1) +
+            user?.Email.Substring(0, 3);
+        byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo)); // 32 bytes
+        byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));  // 16 bytes
 
         var submittedDataList = new List<object>();
 
@@ -117,16 +126,11 @@ public class TaskActionService : ITaskActionService
             var encryptedFileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
             var encryptedPath = Path.Combine(uploadFolder, encryptedFileName);
 
-            // Encrypt file
             using (var fs = new FileStream(encryptedPath, FileMode.Create))
             using (var aes = Aes.Create())
             {
-                // string secret_iv = user.FirstName.Substring(0, 1) + user.FirstName.Substring(user.FirstName.Length - 2) + user.LastName.Substring(0, 1) + user.Phone;
-                // string secret_key = secret_iv + secret_iv;
-                // aes.Key = Encoding.UTF8.GetBytes(secret_key);
-                // aes.IV = Encoding.UTF8.GetBytes(secret_iv);
-                aes.Key = Encoding.UTF8.GetBytes("12345678901234567890123456789012");
-                aes.IV = Encoding.UTF8.GetBytes("1234567890123456");
+                aes.Key = key;
+                aes.IV = iv;
 
                 using var cryptoStream = new CryptoStream(fs, aes.CreateEncryptor(), CryptoStreamMode.Write);
                 await file.CopyToAsync(cryptoStream);
@@ -148,9 +152,9 @@ public class TaskActionService : ITaskActionService
             SubmittedAt = DateTime.Now,
             SubmittedData = JsonSerializer.Serialize(submittedDataList)
         };
+
         if (dto.TaskActionId != null && dto.TaskActionId != 0)
         {
-            // Perform update when Task is reassigned
             taskAction.Id = (int)dto.TaskActionId!;
             await _taskActionRepository.UpdateTaskActionAsync(taskAction);
         }
@@ -163,15 +167,12 @@ public class TaskActionService : ITaskActionService
         task.Status = (int?)Status.StatusEnum.Review;
         await _taskAssignRepository.UpdateTaskAssignAsync(task);
 
-        // send mail to admin
+        // Send notifications
         string emailBodyAdmin = await GetTaskEmailBody(dto.FkTaskId, "TaskPerformedTemplate");
         _emailService.SendMail("admin@gmail.com", "Task Performed", emailBodyAdmin);
-
-        //send notification to admin
         await _notificationService.AddNotification(1, dto.FkTaskId);
 
         return taskAction.Id;
-
     }
 
     public async Task<string> GetTaskEmailBody(string templateName = "WelcomeMailTemplate")

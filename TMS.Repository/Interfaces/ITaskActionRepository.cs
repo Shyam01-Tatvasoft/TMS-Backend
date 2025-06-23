@@ -9,4 +9,5 @@ public interface ITaskActionRepository
     public Task<TaskAction> AddTaskActionAsync(TaskAction taskAction);
     public Task<TaskAction?> GetTaskActionByTaskIdAsync(int taskId);
     public Task<int> UpdateTaskActionAsync(TaskAction taskAction);
+    public Task<List<TaskAction>?> GetTaskActionByUserIdAsync(int id);
 }
