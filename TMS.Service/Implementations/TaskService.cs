@@ -84,12 +84,12 @@ public class TaskService : ITaskService
         return TaskAssignDto;
     }
 
-    public async Task<(int id, string message)> AddTaskAssignAsync(AddTaskDto task,string role)
+    public async Task<(int id, string message)> AddTaskAssignAsync(AddTaskDto task, string role)
     {
         User? user = await _userRepository.GetByIdAsync((int)task.FkUserId!);
         if (user == null)
             return (0, "User not found.");
-        if(role == "Admin" && task.Status.HasValue && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Pending && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Cancelled )
+        if (role == "Admin" && task.Status.HasValue && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Pending && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Cancelled)
         {
             return (0, "Invalid status.");
         }
@@ -112,9 +112,9 @@ public class TaskService : ITaskService
             CreatedAt = DateTime.Now,
         };
         await _taskAssignRepository.AddTaskAssignAsync(newTask);
-        await _notificationService.AddNotification((int)task.FkUserId, newTask.Id);
+        await _notificationService.AddNotification((int)task.FkUserId, newTask.Id, (int)Repository.Enums.Notification.NotificationEnum.Assigned);
         string emailBody = await GetTaskEmailBody(newTask.Id);
-        _emailService.SendMail(newTask.FkUser.Email, "New Task Assigned", emailBody);
+        _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
         return (newTask.Id, "Task assigned successfully.");
     }
 
@@ -130,8 +130,8 @@ public class TaskService : ITaskService
         {
             return (false, "Cannot change the status of a task that is in progress.");
         }
-        
-        if(role == "User" && task.Status.HasValue && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Pending && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.InProgress && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.OnHold)
+
+        if (role == "User" && task.Status.HasValue && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Pending && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.InProgress && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.OnHold)
         {
             return (false, "Invalid status.");
         }
@@ -162,8 +162,8 @@ public class TaskService : ITaskService
         emailBody = emailBody.Replace("{{UserName}}", task?.FkUser.FirstName + " " + task.FkUser.LastName ?? "User");
         emailBody = emailBody.Replace("{{TaskType}}", task.FkTask?.Name ?? "-");
         emailBody = emailBody.Replace("{{SubTask}}", task.FkSubtask?.Name ?? "-");
-        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority.Value).ToString() ?? "-");
-        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status.Value).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority.Value!).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status.Value!).ToString() ?? "-");
         emailBody = emailBody.Replace("{{DueDate}}", task.DueDate.ToString("dd MMM yyyy"));
         emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
 
@@ -180,9 +180,9 @@ public class TaskService : ITaskService
 
         taskAssign.Status = (int)Status.StatusEnum.Completed;
         await _taskAssignRepository.UpdateTaskAssignAsync(taskAssign);
-        await _notificationService.AddNotification((int)taskAssign.FkUserId, taskAssign.Id);
+        await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Approved);
         string emailBody = await GetTaskEmailBody(taskAssign.Id);
-        _emailService.SendMail(taskAssign.FkUser.Email, "Task Approved", emailBody);
+        _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Approved", emailBody);
         return taskAssign;
     }
 
@@ -196,15 +196,15 @@ public class TaskService : ITaskService
 
         taskAssign.Description = dto.Comments;
         taskAssign.Status = (int)Status.StatusEnum.Pending;
-        
+
         await _taskAssignRepository.UpdateTaskAssignAsync(taskAssign);
-        
+
         // Reassign task email
         string emailBody = await GetTaskEmailBody(taskAssign.Id, "TaskReassignedTemplate");
-        _emailService.SendMail(taskAssign.FkUser.Email, "Task Reassigned", emailBody);
+        _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Reassigned", emailBody);
 
         // Notify user
-        await _notificationService.AddNotification((int)taskAssign.FkUserId, taskAssign.Id);
+        await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Reassigned);
         return taskAssign;
     }
 }

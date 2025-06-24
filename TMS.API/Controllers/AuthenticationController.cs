@@ -17,12 +17,14 @@ public class AuthenticationController : ControllerBase
     private readonly IJWTService _jwtService;
     private readonly ICountryService _countryService;
     private readonly APIResponse _response;
+    private readonly ILogService _logService;
 
-    public AuthenticationController(IAuthenticationService autService, IJWTService jwtService, ICountryService countryService)
+    public AuthenticationController(IAuthenticationService autService, IJWTService jwtService, ICountryService countryService, ILogService logService)
     {
         _autService = autService;
         _jwtService = jwtService;
         _countryService = countryService;
+        _logService = logService;
         this._response = new();
     }
 
@@ -104,9 +106,9 @@ public class AuthenticationController : ControllerBase
 
     [ApiExplorerSettings(IgnoreApi = true)]
     [HttpGet("reset-password")]
-    public async Task<ActionResult<APIResponse>> ResetPassword(string token,string type)
+    public async Task<ActionResult<APIResponse>> ResetPassword(string token, string type)
     {
-        string? email = await _autService.ValidateResetToken(token,type);
+        string? email = await _autService.ValidateResetToken(token, type);
         if (string.IsNullOrEmpty(token))
         {
             _response.ErrorMessage = new List<String> { "Invalid token" };
@@ -116,7 +118,7 @@ public class AuthenticationController : ControllerBase
         }
         if (string.IsNullOrEmpty(email))
         {
-             _response.ErrorMessage = new List<String> { "Invalid token" };
+            _response.ErrorMessage = new List<String> { "Invalid token" };
             _response.IsSuccess = false;
             _response.StatusCode = HttpStatusCode.BadRequest;
             return BadRequest(_response);
@@ -141,7 +143,7 @@ public class AuthenticationController : ControllerBase
             return BadRequest(_response);
         }
 
-        var email = await _autService.ValidateResetToken(dto.Token,dto.Type);
+        var email = await _autService.ValidateResetToken(dto.Token, dto.Type);
         if (string.IsNullOrEmpty(email))
         {
             _response.IsSuccess = false;

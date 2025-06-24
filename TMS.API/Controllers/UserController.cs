@@ -1,10 +1,13 @@
 using System.Net;
+using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
+using TMS.Repository.Enums;
 using TMS.Service.Interfaces;
 
 namespace TMS.API.Controllers;
@@ -16,11 +19,13 @@ public class UserController : ControllerBase
     private readonly IUserService _userService;
     private readonly APIResponse _response;
     private readonly IJWTService _jwtService;
+    private readonly ILogService _logService;
 
-    public UserController(IUserService userService,IJWTService jwtService)
+    public UserController(IUserService userService,IJWTService jwtService,ILogService logService)
     {
         _userService = userService;
         _jwtService = jwtService;
+        _logService = logService;
         this._response = new();
     }
 
@@ -28,14 +33,17 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetUsers()
-    {
+    {   
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
             List<UserDto> userList = await _userService.GetUsers();
+            await _logService.LogAsync("Get User", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, string.Empty);
             return Ok(userList);
         }
-        catch (System.Exception)
-        {
+        catch (System.Exception ex)
+        {   
+            await _logService.LogAsync("Get User", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, string.Empty);
             return StatusCode(500);
         }
     }
@@ -45,6 +53,7 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetFilteredUsers()
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
             var draw = Request.Form["draw"].FirstOrDefault();
@@ -65,10 +74,12 @@ public class UserController : ControllerBase
                 recordsTotal = totalCount,
                 data = userList
             };
+            await _logService.LogAsync("Get filtered user", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, string.Empty);
             return Ok(result);
         }
-        catch (System.Exception)
+        catch (System.Exception ex)
         {
+            await _logService.LogAsync("Get filtered user", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, string.Empty);
             return StatusCode(500);
         }
     }
@@ -96,11 +107,13 @@ public class UserController : ControllerBase
         try
         {   
             _response.Result = await _userService.GetUserByEmail(email);
+            await _logService.LogAsync("Get user", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, string.Empty);
         }
         catch (System.Exception ex)
         {
             _response.StatusCode = HttpStatusCode.InternalServerError;
             _response.ErrorMessage = new List<string> { ex.Message };
+            await _logService.LogAsync("Get user", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, string.Empty);
             return StatusCode((int)HttpStatusCode.InternalServerError, _response);
         }
         _response.IsSuccess = true;
@@ -111,6 +124,7 @@ public class UserController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<APIResponse>> GetUserById(int id)
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
             UserDto user = await _userService.GetUserById(id);
@@ -124,12 +138,14 @@ public class UserController : ControllerBase
             _response.Result = user;
             _response.StatusCode = HttpStatusCode.OK;
             _response.IsSuccess = true;
+            await _logService.LogAsync("Get user", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, id.ToString());
             return Ok(_response);
         }
         catch (System.Exception ex)
         {
             _response.StatusCode = HttpStatusCode.InternalServerError;
             _response.ErrorMessage = new List<string> { ex.Message };
+            await _logService.LogAsync("Get user", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, id.ToString());
             return StatusCode((int)HttpStatusCode.InternalServerError, _response);
         }
     }
@@ -137,6 +153,7 @@ public class UserController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<APIResponse>> AddUser([FromForm] AddEditUserDto userDto)
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         if (!ModelState.IsValid)
         {
             _response.IsSuccess = false;
@@ -151,12 +168,18 @@ public class UserController : ControllerBase
             _response.IsSuccess = success;
             _response.ErrorMessage = success ? null : new List<string> { message };
             _response.Result = success ? message : null;
+
+            if(success)
+            {
+                await _logService.LogAsync("Add User", int.Parse(userId!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(userDto));
+            }
             return Ok(_response);
         }
         catch (System.Exception ex)
         {
             _response.StatusCode = HttpStatusCode.InternalServerError;
             _response.ErrorMessage = new List<string> { ex.Message };
+            await _logService.LogAsync("Add User", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(userDto));
             return StatusCode((int)HttpStatusCode.InternalServerError, _response);
         }
     }
@@ -165,6 +188,7 @@ public class UserController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<APIResponse>> UpdateUser(int id, [FromForm] AddEditUserDto userDto)
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         if (id != userDto.Id)
         {
             _response.StatusCode = HttpStatusCode.BadRequest;
@@ -186,12 +210,18 @@ public class UserController : ControllerBase
             _response.IsSuccess = success;
             _response.ErrorMessage = success ? null : new List<string> { message };
             _response.Result = success ? message : null;
+
+            if(success)
+            {
+                await _logService.LogAsync("Update User", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(userDto));
+            }
             return Ok(_response);
         }
         catch (System.Exception ex)
         {
             _response.StatusCode = HttpStatusCode.InternalServerError;
             _response.ErrorMessage = new List<string> { ex.Message };
+            await _logService.LogAsync("Update User", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(userDto));
             return StatusCode((int)HttpStatusCode.InternalServerError, _response);
         }
     }
@@ -199,6 +229,7 @@ public class UserController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<ActionResult<APIResponse>> DeleteUser(int id)
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
             var (success, message) = await _userService.DeleteUser(id);
@@ -206,12 +237,14 @@ public class UserController : ControllerBase
             _response.IsSuccess = success;
             _response.ErrorMessage = success ? null : new List<string> { message };
             _response.Result = success ? message : null;
+            await _logService.LogAsync("Delete User", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, id.ToString());
             return Ok(_response);
         }
         catch (System.Exception ex)
         {
             _response.StatusCode = HttpStatusCode.InternalServerError;
             _response.ErrorMessage = new List<string> { ex.Message };
+            await _logService.LogAsync("Delete User", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, id.ToString());
             return StatusCode((int)HttpStatusCode.InternalServerError, _response);
         }
     }

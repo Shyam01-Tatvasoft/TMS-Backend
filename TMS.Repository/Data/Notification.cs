@@ -13,6 +13,10 @@ public partial class Notification
 
     public int? FkUserId { get; set; }
 
+    public int? Status { get; set; }
+
+    public DateTime? CreatedAt { get; set; }
+
     public virtual TaskAssign? FkTask { get; set; }
 
     public virtual User? FkUser { get; set; }

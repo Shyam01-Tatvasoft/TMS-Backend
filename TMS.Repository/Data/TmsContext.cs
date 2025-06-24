@@ -19,6 +19,8 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<CountryTimezone> CountryTimezones { get; set; }
 
+    public virtual DbSet<Log> Logs { get; set; }
+
     public virtual DbSet<Notification> Notifications { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }
@@ -85,6 +87,30 @@ public partial class TmsContext : DbContext
                 .HasConstraintName("timezone_country_id_fkey");
         });
 
+        modelBuilder.Entity<Log>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("logs_pkey");
+
+            entity.ToTable("logs");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Action)
+                .HasMaxLength(100)
+                .HasColumnName("action");
+            entity.Property(e => e.Data).HasColumnName("data");
+            entity.Property(e => e.Date)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("date");
+            entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
+            entity.Property(e => e.Message).HasColumnName("message");
+            entity.Property(e => e.Stacktrash).HasColumnName("stacktrash");
+
+            entity.HasOne(d => d.FkUser).WithMany(p => p.Logs)
+                .HasForeignKey(d => d.FkUserId)
+                .HasConstraintName("logs_fk_user_id_fkey");
+        });
+
         modelBuilder.Entity<Notification>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("notification_pkey");
@@ -92,9 +118,13 @@ public partial class TmsContext : DbContext
             entity.ToTable("notification");
 
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
             entity.Property(e => e.FkTaskId).HasColumnName("fk_task_id");
             entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
             entity.Property(e => e.IsRead).HasColumnName("is_read");
+            entity.Property(e => e.Status).HasColumnName("status");
 
             entity.HasOne(d => d.FkTask).WithMany(p => p.Notifications)
                 .HasForeignKey(d => d.FkTaskId)

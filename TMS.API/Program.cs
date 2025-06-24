@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TMS.API.Hubs;
+using TMS.API.Middleware;
 using TMS.Repository.Data;
 using TMS.Repository.Implementations;
 using TMS.Repository.Interfaces;
@@ -41,6 +42,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IHolidayService, HolidayService>();
 builder.Services.AddScoped<ITaskActionService, TaskActionService>();
+builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddHttpClient<HolidayService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -50,6 +52,7 @@ builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<ITaskAssignRepository,TaskAssignRepository >();
 builder.Services.AddScoped<INotificationRepository,NotificationRepository >();
 builder.Services.AddScoped<ITaskActionRepository,TaskActionRepository>();
+builder.Services.AddScoped<ILogRepository, LogRepository>();
 builder.Services.AddHttpClient<CountryRepository>();
 
 
@@ -132,13 +135,13 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseMiddleware<ExceptionMiddleware>();
 app.UseRouting();
 app.UseCors("AllowSpecificOrigin");
 app.UseHttpsRedirection();

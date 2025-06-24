@@ -143,12 +143,14 @@ public class UserService : IUserService
             user?.Phone?.Substring(0, 1) +
             user?.Email.Substring(0, 3);
 
-        // bool isDocumentUpdated = await UpdateUserDocuments(oldCombined, newCombined, (int)user?.Id!);
+        if (oldCombined != newCombined)
+        {
+            bool isDocumentUpdated = await UpdateUserDocuments(oldCombined, newCombined, (int)user?.Id!);
+            if (!isDocumentUpdated)
+                return (false, "Error while update the user.");
+        }
 
-        // if (!isDocumentUpdated)
-        //     return (false, "Error while update the user.");
-
-        // add profile image handling
+        // start profile image handling
         string ProfileImagePath = null;
         if (user?.ProfileImage != null && user.ProfileImage.Length > 0)
         {
@@ -177,71 +179,57 @@ public class UserService : IUserService
         return response ? (true, "User updated successfully.") : (false, "User Not Found.");
     }
 
-
-    public async Task<bool> UpdateUserDocuments(string oldCombined, string newCombined, int id)
+    public async Task<bool> UpdateUserDocuments(string oldCombined, string newCombined, int userId)
     {
-        byte[] oldKey = SHA256.HashData(Encoding.UTF8.GetBytes(oldCombined));
-        byte[] oldIV = MD5.HashData(Encoding.UTF8.GetBytes(oldCombined));
+        string userFolder = Path.Combine(Directory.GetCurrentDirectory(), "Upload", userId.ToString());
 
-        byte[] newKey = SHA256.HashData(Encoding.UTF8.GetBytes(newCombined));
-        byte[] newIV = MD5.HashData(Encoding.UTF8.GetBytes(newCombined));
-
-        List<TaskAction>? userTaskActions = await _taskActionRepository.GetTaskActionByUserIdAsync(id);
-        var uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedEncrypted");
-        if (!Directory.Exists(uploadFolder))
-            Directory.CreateDirectory(uploadFolder);
-        if(userTaskActions == null)
+        if (!Directory.Exists(userFolder))
             return true;
 
-        foreach (var action in userTaskActions)
-        {
-            if (action?.FkTask?.FkTaskId != 2)
-                continue;
-            var submittedDataList = new List<object>();
-            var submittedData = JsonSerializer.Deserialize<List<TaskFileMetadata>>(action.SubmittedData!);
+        // Generate old key,IV
+        byte[] oldKey = SHA256.HashData(Encoding.UTF8.GetBytes(oldCombined));
+        byte[] oldIv = MD5.HashData(Encoding.UTF8.GetBytes(oldCombined));
 
-            foreach (var fileMeta in submittedData!)
+        // Generate new key,IV
+        byte[] newKey = SHA256.HashData(Encoding.UTF8.GetBytes(newCombined));
+        byte[] newIv = MD5.HashData(Encoding.UTF8.GetBytes(newCombined));
+
+        var files = Directory.GetFiles(userFolder);
+
+        foreach (var filePath in files)
+        {
+            try
             {
-                var filePath = Path.Combine(uploadFolder, fileMeta.StoredFileName);
-                var tempPath = filePath + ".tmp";
-                // decrypt
-                byte[] decryptedContent;
+                // Decrypt with old key
+                byte[] decryptedData;
                 using (var inputStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                 using (var aes = Aes.Create())
                 {
                     aes.Key = oldKey;
-                    aes.IV = oldIV;
+                    aes.IV = oldIv;
                     using var cryptoStream = new CryptoStream(inputStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
                     using var ms = new MemoryStream();
                     await cryptoStream.CopyToAsync(ms);
-                    decryptedContent = ms.ToArray();
+                    decryptedData = ms.ToArray();
                 }
-                
-                //encrypt
-                using (var fs = new FileStream(filePath, FileMode.Create))
-                using (var aes = Aes.Create())
-                {
-                    aes.Key = newKey;
-                    aes.IV = newIV;
-                    using var cryptoStream = new CryptoStream(fs, aes.CreateEncryptor(), CryptoStreamMode.Write);
-                    await cryptoStream.WriteAsync(decryptedContent, 0, decryptedContent.Length);
-                }
-                File.Delete(filePath);
-                
-                File.Move(tempPath, filePath);
 
-                submittedDataList.Add(new
+                // Encrypt with new key and overwrite original file
+                using (var outputStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+                using (var aesNew = Aes.Create())
                 {
-                    OriginalFileName = fileMeta.OriginalFileName,
-                    StoredFileName = fileMeta.StoredFileName,
-                    Size = fileMeta.Size,
-                    UploadedAt = fileMeta.UploadedAt
-                });
+                    aesNew.Key = newKey;
+                    aesNew.IV = newIv;
+                    using var cryptoStream = new CryptoStream(outputStream, aesNew.CreateEncryptor(), CryptoStreamMode.Write);
+                    await cryptoStream.WriteAsync(decryptedData, 0, decryptedData.Length);
+                }
             }
-
-            action.SubmittedData = JsonSerializer.Serialize(submittedDataList);
-            await _taskActionRepository.UpdateTaskActionAsync(action);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to update file {ex.Message}");
+                return false;
+            }
         }
+
         return true;
     }
 

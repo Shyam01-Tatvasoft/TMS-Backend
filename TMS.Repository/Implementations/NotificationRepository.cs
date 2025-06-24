@@ -20,6 +20,7 @@ public class NotificationRepository : INotificationRepository
             .Include(n => n.FkTask)
             .Include(n => n.FkTask.FkUser)
             .Include(n => n.FkTask.FkTask)
+            .OrderByDescending(n => n.CreatedAt)
             .ToListAsync();
     }
 

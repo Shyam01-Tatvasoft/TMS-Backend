@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using TMS.Service.Interfaces;
@@ -10,10 +11,11 @@ namespace TMS.API.Controllers;
 public class NotificationController : Controller
 {
     private readonly INotificationService _notificationService;
-
-    public NotificationController(INotificationService notificationService)
+    private ILogService _logService;
+    public NotificationController(INotificationService notificationService,ILogService logService)
     {
         _notificationService = notificationService;
+        _logService = logService;
     }
 
     [HttpGet("{id}")]
@@ -22,6 +24,7 @@ public class NotificationController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetNotificationById(int id)
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
             var notification = await _notificationService.GetNotificationAsync(id);
@@ -29,10 +32,12 @@ public class NotificationController : Controller
             {
                 return NotFound();
             }
+            await _logService.LogAsync("Get Notifications.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, string.Empty);
             return Ok(notification);
         }
-        catch (System.Exception)
+        catch (System.Exception ex)
         {
+            await _logService.LogAsync("Get Notifications.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, id.ToString());
             return StatusCode(500, "Internal server error");
         }
     }
@@ -42,13 +47,16 @@ public class NotificationController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> MarkAsRead(int id)
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
             string result = await _notificationService.MarkAsRead(id);
-                return Ok(result);
+            await _logService.LogAsync("Mark as read notification.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, id.ToString());
+            return Ok(result);
         }
-        catch (System.Exception)
+        catch (System.Exception ex)
         {
+            await _logService.LogAsync("Mark as read notification.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), ex.StackTrace, id.ToString());
             return StatusCode(500, "Internal server error");
         }
     }

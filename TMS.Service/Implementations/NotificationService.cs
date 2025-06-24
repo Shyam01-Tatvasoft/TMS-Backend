@@ -18,7 +18,7 @@ public class NotificationService : INotificationService
 
     public async Task<List<NotificationDto>> GetNotificationAsync(int userId)
     {
-        List<Notification> notifications = await _notificationRepository.GetNotificationsAsync(userId);
+        List<Repository.Data.Notification> notifications = await _notificationRepository.GetNotificationsAsync(userId);
         List<NotificationDto> notificationDtos = new();
         notifications.ForEach(n =>
         {
@@ -30,22 +30,25 @@ public class NotificationService : INotificationService
                 TaskType = n.FkTask.FkTask.Name,
                 TaskDescription = n.FkTask.Description,
                 Priority = n.FkTask.Priority.HasValue ? ((Priority.PriorityEnum)n.FkTask.Priority.Value).ToString() : "Unknown",
-                Status = n.FkTask.Status.HasValue ? ((Status.StatusEnum)n.FkTask.Status.Value).ToDescription() : "Unknown",
+                Status = n.Status != null ? ((Repository.Enums.Notification.NotificationEnum)n.Status!).ToDescription() : "Unknown",
                 IsRead = n.IsRead,
-                UserName = n.FkTask.FkUser != null ? n.FkTask.FkUser.FirstName + " " + n.FkTask.FkUser.LastName : string.Empty
+                UserName = n.FkTask.FkUser != null ? n.FkTask.FkUser.FirstName + " " + n.FkTask.FkUser.LastName : string.Empty,
+                CreatedAt = n.CreatedAt
             });
         });
 
         return notificationDtos;
     }
 
-    public async Task<Notification> AddNotification(int userId, int taskId)
+    public async Task<Repository.Data.Notification> AddNotification(int userId, int taskId,int status)
     {
-        Notification notification = new()
+        Repository.Data.Notification notification = new()
         {
             FkUserId = userId,
             FkTaskId = taskId,
-            IsRead = false
+            IsRead = false,
+            Status = status,
+            CreatedAt = DateTime.Now
         };
         await _notificationRepository.AddNotification(notification);
         return notification;

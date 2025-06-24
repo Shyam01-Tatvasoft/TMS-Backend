@@ -94,7 +94,7 @@ public class TaskActionService : ITaskActionService
         _emailService.SendMail("admin@gmail.com", "Task Performed", emailBodyAdmin);
 
         //send notification to admin
-        await _notificationService.AddNotification(1, emailTask.FkTaskId);
+        await _notificationService.AddNotification(1, emailTask.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
         return taskAction.Id;
     }
 
@@ -105,18 +105,20 @@ public class TaskActionService : ITaskActionService
         var userId = dto.FkUserId;
         UserDto? user = await _userService.GetUserById(userId);
 
-        var uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "UploadedEncrypted");
-        if (!Directory.Exists(uploadFolder))
-            Directory.CreateDirectory(uploadFolder);
+        var userFolder = Path.Combine(Directory.GetCurrentDirectory(), "Upload", userId.ToString());
+
+        if (!Directory.Exists(userFolder))
+            Directory.CreateDirectory(userFolder);
 
         // Generate Key and IV based on user details
-        string combinedUserInfo = 
+        string combinedUserInfo =
             user?.FirstName.Substring(0, 2) +
             user?.LastName.Substring(user.LastName.Length - 2) +
             user?.Phone?.Substring(0, 1) +
             user?.Email.Substring(0, 3);
+
         byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo)); // 32 bytes
-        byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));  // 16 bytes
+        byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));    // 16 bytes
 
         var submittedDataList = new List<object>();
 
@@ -124,7 +126,7 @@ public class TaskActionService : ITaskActionService
         {
             var originalFileName = file.FileName;
             var encryptedFileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
-            var encryptedPath = Path.Combine(uploadFolder, encryptedFileName);
+            var encryptedPath = Path.Combine(userFolder, encryptedFileName);
 
             using (var fs = new FileStream(encryptedPath, FileMode.Create))
             using (var aes = Aes.Create())
@@ -170,7 +172,7 @@ public class TaskActionService : ITaskActionService
         // Send notifications
         string emailBodyAdmin = await GetTaskEmailBody(dto.FkTaskId, "TaskPerformedTemplate");
         _emailService.SendMail("admin@gmail.com", "Task Performed", emailBodyAdmin);
-        await _notificationService.AddNotification(1, dto.FkTaskId);
+        await _notificationService.AddNotification(1, dto.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
 
         return taskAction.Id;
     }

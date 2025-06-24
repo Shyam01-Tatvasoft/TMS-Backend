@@ -1,6 +1,8 @@
 using System.IO.Compression;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -19,13 +21,15 @@ public class TaskActionController : ControllerBase
     private readonly IJWTService _jwtService;
     private readonly IHubContext<NotificationHub> _hubContext;
     private readonly IUserService _userService;
+    private readonly ILogService _logService;
 
-    public TaskActionController(ITaskActionService taskActionService, IJWTService jwtService, IHubContext<NotificationHub> hubContext, IUserService userService)
+    public TaskActionController(ITaskActionService taskActionService, IJWTService jwtService, IHubContext<NotificationHub> hubContext, IUserService userService, ILogService logService)
     {
         _jwtService = jwtService;
         _taskActionService = taskActionService;
         _hubContext = hubContext;
         _userService = userService;
+        _logService = logService;
     }
 
     [HttpPost("send-email")]
@@ -34,6 +38,7 @@ public class TaskActionController : ControllerBase
     [ProducesResponseType(500)]
     public async Task<IActionResult> SendEmail([FromBody] EmailTaskDto dto)
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
             if (dto == null || string.IsNullOrEmpty(dto.Email) || string.IsNullOrEmpty(dto.Subject))
@@ -47,10 +52,12 @@ public class TaskActionController : ControllerBase
                 return StatusCode(500, "Failed to add task action.");
             }
             await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
+            await _logService.LogAsync("Perform email task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             return Ok(taskAction);
         }
-        catch (System.Exception)
+        catch (System.Exception ex)
         {
+            await _logService.LogAsync("Perform email task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(dto));
             return StatusCode(500, "An error occurred while processing your request.");
         }
     }
@@ -61,6 +68,7 @@ public class TaskActionController : ControllerBase
     [ProducesResponseType(500)]
     public async Task<IActionResult> UploadFiles([FromForm] UploadFileTaskDto dto)
     {
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         var files = dto.Files;
 
         if (files.Count == 0)
@@ -73,11 +81,13 @@ public class TaskActionController : ControllerBase
             {
                 return StatusCode(500, "Failed to add task action.");
             }
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification","1", "User Performed an action.");
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
+            await _logService.LogAsync("Perform upload file task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             return Ok(taskAction);
         }
         catch (System.Exception)
         {
+            await _logService.LogAsync("Perform upload file task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             return StatusCode(500, "An error occurred while processing your request.");
         }
     }
@@ -93,9 +103,9 @@ public class TaskActionController : ControllerBase
         {
             return Unauthorized();
         }
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
         try
         {
-            var (email, role, userId) = _jwtService.ValidateToken(authToken);
             if (email == null || role == null || userId == null)
             {
                 return Unauthorized();
@@ -109,10 +119,12 @@ public class TaskActionController : ControllerBase
             {
                 return Unauthorized("You do not have permission to access this task action.");
             }
+            await _logService.LogAsync("Get task action.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, id.ToString());
             return Ok(taskAction);
         }
-        catch (System.Exception)
+        catch (System.Exception ex)
         {
+            await _logService.LogAsync("Get task action.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, id.ToString());
             return StatusCode(500);
         }
     }
@@ -122,98 +134,110 @@ public class TaskActionController : ControllerBase
     [ApiExplorerSettings(IgnoreApi = true)]
     public async Task<FileContentResult> DownloadDecryptedFile(string filename, int userId)
     {
-        var user = await _userService.GetUserById(userId);
-        if (user == null)
-            throw new Exception("User not found");
+        // string? id = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        // try
+        // {
+            var user = await _userService.GetUserById(userId);
+            if (user == null)
+                throw new Exception("User not found");
 
-        string combinedUserInfo = 
-            user?.FirstName.Substring(0, 2) +
-            user?.LastName.Substring(user.LastName.Length - 2) +
-            user?.Phone?.Substring(0, 1) +
-            user?.Email.Substring(0, 3);
-        byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo)); // 32 bytes
-        byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));     // 16 bytes
+            string combinedUserInfo =
+                user?.FirstName.Substring(0, 2) +
+                user?.LastName.Substring(user.LastName.Length - 2) +
+                user?.Phone?.Substring(0, 1) +
+                user?.Email.Substring(0, 3);
+            byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
+            byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
 
-        var filePath = Path.Combine(Directory.GetCurrentDirectory(), "UploadedEncrypted", filename);
-        if (!System.IO.File.Exists(filePath))
-            throw new FileNotFoundException("Encrypted file not found");
+            string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Upload", userId.ToString(), filename);
+            if (!System.IO.File.Exists(filePath))
+                throw new FileNotFoundException("Encrypted file not found");
 
-        using var encryptedFileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-        using var aes = Aes.Create();
-        aes.Key = key;
-        aes.IV = iv;
+            using var encryptedFileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            using var aes = Aes.Create();
+            aes.Key = key;
+            aes.IV = iv;
 
-        using var cryptoStream = new CryptoStream(encryptedFileStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
-        using var memoryStream = new MemoryStream();
-        await cryptoStream.CopyToAsync(memoryStream);
+            using var cryptoStream = new CryptoStream(encryptedFileStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
+            using var memoryStream = new MemoryStream();
+            await cryptoStream.CopyToAsync(memoryStream);
 
-        byte[] fileBytes = memoryStream.ToArray();
+            byte[] fileBytes = memoryStream.ToArray();
 
-        return new FileContentResult(fileBytes, "application/octet-stream")
-        {
-            FileDownloadName = "Decrypted_" + Path.GetFileNameWithoutExtension(filename)
-        };
+            // await _logService.LogAsync("Download file.", int.Parse(id!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, filename);
+            return new FileContentResult(fileBytes, "application/octet-stream")
+            {
+                FileDownloadName = "Decrypted_" + Path.GetFileNameWithoutExtension(filename)
+            };
+        // }
+        // catch (System.Exception)
+        // {
+        //     await _logService.LogAsync("Download file.", int.Parse(id!), Repository.Enums.Log.LogEnum.Exception.ToString(), string.Empty, filename);
+        //     throw;
+        // }
+
     }
-
 
     [HttpGet("download-zip")]
     [ProducesResponseType(typeof(FileResult), 200)]
     [ApiExplorerSettings(IgnoreApi = true)]
     public async Task<IActionResult> DownloadFilesAsZip(int id, string userId)
     {
-        var submittedData = await _taskActionService.GetTaskFileData(id);
-        if (submittedData == null || !submittedData.Any())
-            return NotFound("No file found");
+        // string? authUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        // try
+        // {
+            var submittedData = await _taskActionService.GetTaskFileData(id);
+            if (submittedData == null || !submittedData.Any())
+                return NotFound("No file found");
 
-        // Get User
-        var user = await _userService.GetUserById(int.Parse(userId));
-        if (user == null)
-            return BadRequest("Invalid user");
+            var user = await _userService.GetUserById(int.Parse(userId));
+            if (user == null)
+                return BadRequest("Invalid user");
 
-        // Generate Key and IV from user details
-        string combinedUserInfo = 
-            user?.FirstName.Substring(0, 2) +
-            user?.LastName.Substring(user.LastName.Length - 2) +
-            user?.Phone?.Substring(0, 1) +
-            user?.Email.Substring(0, 3);
-        byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
-        byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
+            string combinedUserInfo =
+                user?.FirstName.Substring(0, 2) +
+                user?.LastName.Substring(user.LastName.Length - 2) +
+                user?.Phone?.Substring(0, 1) +
+                user?.Email.Substring(0, 3);
+            byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
+            byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
 
-        // Prepare temp directory for decrypted files
-        string tempDir = Path.Combine(Path.GetTempPath(), $"Task_{id}_{Guid.NewGuid()}");
-        Directory.CreateDirectory(tempDir);
+            string tempDir = Path.Combine(Path.GetTempPath(), $"Task_{id}_{Guid.NewGuid()}");
+            Directory.CreateDirectory(tempDir);
 
-        string uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "UploadedEncrypted");
+            string userUploadPath = Path.Combine(Directory.GetCurrentDirectory(), "Upload", userId);
 
-        foreach (var file in submittedData)
-        {
-            string sourcePath = Path.Combine(uploadPath, file.StoredFileName);
-            string destPath = Path.Combine(tempDir, file.OriginalFileName);
+            foreach (var file in submittedData)
+            {
+                string sourcePath = Path.Combine(userUploadPath, file.StoredFileName);
+                string destPath = Path.Combine(tempDir, file.OriginalFileName);
 
-            using var inputStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read);
-            using var outputStream = new FileStream(destPath, FileMode.Create);
-            using var aes = Aes.Create();
+                using var inputStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read);
+                using var outputStream = new FileStream(destPath, FileMode.Create);
+                using var aes = Aes.Create();
+                aes.Key = key;
+                aes.IV = iv;
 
-            aes.Key = key;
-            aes.IV = iv;
+                using var cryptoStream = new CryptoStream(inputStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
+                await cryptoStream.CopyToAsync(outputStream);
+            }
 
-            using var cryptoStream = new CryptoStream(inputStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
-            await cryptoStream.CopyToAsync(outputStream);
-        }
+            string zipPath = Path.Combine(Path.GetTempPath(), $"Task_{id}_Files.zip");
+            if (System.IO.File.Exists(zipPath)) System.IO.File.Delete(zipPath);
 
-        // Create zip archive
-        string zipPath = Path.Combine(Path.GetTempPath(), $"Task_{id}_Files.zip");
-        if (System.IO.File.Exists(zipPath)) System.IO.File.Delete(zipPath);
+            ZipFile.CreateFromDirectory(tempDir, zipPath);
+            Directory.Delete(tempDir, true);
 
-        ZipFile.CreateFromDirectory(tempDir, zipPath);
-
-        // Clean up extracted files directory (optional)
-        Directory.Delete(tempDir, true);
-
-        var zipBytes = await System.IO.File.ReadAllBytesAsync(zipPath);
-        System.IO.File.Delete(zipPath); 
-
-        return File(zipBytes, "application/zip", $"TaskAction_{id}_Files.zip");
+            var zipBytes = await System.IO.File.ReadAllBytesAsync(zipPath);
+            System.IO.File.Delete(zipPath);
+            
+            // await _logService.LogAsync("Download zip file.", int.Parse(authUserId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, id.ToString());
+            return File(zipBytes, "application/zip", $"TaskAction_{id}_Files.zip");
+        // }
+        // catch (System.Exception ex)
+        // {
+        //     await _logService.LogAsync("Download zip file.", int.Parse(authUserId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, id.ToString());
+        //     throw;
+        // }
     }
-
 }
