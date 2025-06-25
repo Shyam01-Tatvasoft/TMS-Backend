@@ -55,7 +55,7 @@ public class TaskController : ControllerBase
             var sorting = Request.Form["order[0][column]"].FirstOrDefault();
             var sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
 
-            var (taskList, totalCount) = await _taskService.GetAllTaskAssignAsync(int.Parse(userId), role, skip, pageSize, searchValue,sorting, sortDirection);
+            var (taskList, totalCount) = await _taskService.GetAllTaskAssignAsync(int.Parse(userId), role, skip, pageSize, searchValue, sorting, sortDirection);
 
             var result = new
             {
@@ -108,14 +108,14 @@ public class TaskController : ControllerBase
         {
             if (email == null || role == null || Id == null)
                 return Unauthorized();
-            var result = await _taskService.AddTaskAssignAsync(taskDto,role);
+            var result = await _taskService.AddTaskAssignAsync(taskDto, role);
             if (result.id == 0)
             {
                 return BadRequest(result.message);
             }
             string? userId = taskDto.FkUserId.ToString();
             string message = "New Task Assigned!";
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", userId , message);
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", userId, message);
             await _logService.LogAsync("Add task.", int.Parse(Id!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(taskDto));
             return Created($"/api/tasks/", result.id);
         }
@@ -139,8 +139,8 @@ public class TaskController : ControllerBase
         {
             if (email == null || role == null || userId == null)
                 return Unauthorized();
-            
-            var result = await _taskService.UpdateTaskAssignAsync(taskDto,role);
+
+            var result = await _taskService.UpdateTaskAssignAsync(taskDto, role);
             if (!result.success)
             {
                 return BadRequest(result.message);
@@ -167,7 +167,7 @@ public class TaskController : ControllerBase
         }
         catch (Exception ex)
         {
-            await _logService.LogAsync("Get task types(master table).", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(),  ex.StackTrace, string.Empty);
+            await _logService.LogAsync("Get task types(master table).", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), ex.StackTrace, string.Empty);
             return StatusCode(500);
         }
     }
@@ -190,7 +190,7 @@ public class TaskController : ControllerBase
         {
             _response.IsSuccess = false;
             _response.ErrorMessage = new List<string> { ex.Message };
-             await _logService.LogAsync("Get sub tasks(master table).", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), ex.StackTrace, string.Empty);
+            await _logService.LogAsync("Get sub tasks(master table).", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), ex.StackTrace, string.Empty);
             return StatusCode(500, _response);
         }
     }
@@ -218,13 +218,13 @@ public class TaskController : ControllerBase
             }
 
             TaskAssign result = await _taskService.ApproveTask(id);
-            if(result == null)
+            if (result == null)
             {
                 return BadRequest("Task approval failed.");
             }
             string? taskUserId = result.FkUserId.ToString();
             string message = "Your Task is Approved !";
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId , message);
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId, message);
             await _logService.LogAsync("Approve task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, string.Empty);
             return Ok("Task approved successfully.");
         }
@@ -258,13 +258,13 @@ public class TaskController : ControllerBase
             }
 
             TaskAssign result = await _taskService.ReassignTask(dto);
-            if(result == null)
+            if (result == null)
             {
                 return BadRequest("Task reassignment failed.");
             }
             string? taskUserId = result.FkUserId.ToString();
             string message = "Your Task is Reassigned !";
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId , message);
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId, message);
             await _logService.LogAsync("Reassign tasks.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, string.Empty);
             return Ok("Task reassigned successfully.");
         }
@@ -275,4 +275,30 @@ public class TaskController : ControllerBase
         }
     }
 
+    [HttpGet("schedular-data")]
+    [ProducesResponseType(typeof(List<TaskAssignDto>), 200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> GetTaskForSchedular(DateTime start, DateTime end)
+    {
+        // if (start > end || start < DateTime.Now || end < DateTime.Now)  
+        // {
+        //     return BadRequest("Invalid date range provided.");
+        // }
+        int userId = int.Parse(User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "0");
+        try
+        {
+            var tasks = await _taskService.GetTasksForSchedular(start,end);
+            if (tasks == null || !tasks.Any())
+            {
+                return NotFound("No tasks found for the specified date range.");
+            }
+            await _logService.LogAsync("Get tasks for schedular.", userId, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, $"{start} to {end}");
+            return Ok(tasks);
+        }
+        catch (Exception ex)
+        {
+            await _logService.LogAsync("Get tasks for schedular.", userId, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, $"{start} to {end}");
+            return StatusCode(500, _response);
+        }
+    }
 }

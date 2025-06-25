@@ -67,4 +67,15 @@ public class NotificationService : INotificationService
             return "Notification not found.";
         }
     }
+
+    public async Task<string> MarkAllAsRead(int userId)
+    {
+        int result = await _notificationRepository.MarkAllAsReadAsync(userId);
+        if(result == 0)
+        {
+            return "No notifications to mark as read.";
+        }else{
+            return "All notifications marked as read.";
+        }
+    }
 }

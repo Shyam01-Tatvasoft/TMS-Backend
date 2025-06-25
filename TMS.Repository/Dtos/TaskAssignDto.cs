@@ -20,9 +20,9 @@ public class TaskAssignDto
 
     public DateTime? CreatedAt { get; set; }
 
-   public string TaskName { get; set; } = string.Empty;
-   
-   public string SubTaskName { get; set; } = string.Empty;
+    public string TaskName { get; set; } = string.Empty;
 
-   public int TaskActionId { get; set; }
+    public string SubTaskName { get; set; } = string.Empty;
+
+    public int TaskActionId { get; set; }
 }

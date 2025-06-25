@@ -105,10 +105,6 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
             entity.Property(e => e.Message).HasColumnName("message");
             entity.Property(e => e.Stacktrash).HasColumnName("stacktrash");
-
-            entity.HasOne(d => d.FkUser).WithMany(p => p.Logs)
-                .HasForeignKey(d => d.FkUserId)
-                .HasConstraintName("logs_fk_user_id_fkey");
         });
 
         modelBuilder.Entity<Notification>(entity =>

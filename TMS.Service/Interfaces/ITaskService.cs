@@ -13,4 +13,5 @@ public interface ITaskService
     public Task<List<TaskDto>> GetAllTasksAsync();
     public Task<TaskAssign> ApproveTask(int id);
     public Task<TaskAssign> ReassignTask(ReassignTaskDto dto);
+    public Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start,DateTime end);
 }

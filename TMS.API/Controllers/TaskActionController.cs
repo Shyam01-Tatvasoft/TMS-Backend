@@ -134,9 +134,9 @@ public class TaskActionController : ControllerBase
     [ApiExplorerSettings(IgnoreApi = true)]
     public async Task<FileContentResult> DownloadDecryptedFile(string filename, int userId)
     {
-        // string? id = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-        // try
-        // {
+        string? id = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        try
+        {
             var user = await _userService.GetUserById(userId);
             if (user == null)
                 throw new Exception("User not found");
@@ -164,17 +164,17 @@ public class TaskActionController : ControllerBase
 
             byte[] fileBytes = memoryStream.ToArray();
 
-            // await _logService.LogAsync("Download file.", int.Parse(id!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, filename);
+            await _logService.LogAsync("Download file.", int.Parse(id!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, filename);
             return new FileContentResult(fileBytes, "application/octet-stream")
             {
                 FileDownloadName = "Decrypted_" + Path.GetFileNameWithoutExtension(filename)
             };
-        // }
-        // catch (System.Exception)
-        // {
-        //     await _logService.LogAsync("Download file.", int.Parse(id!), Repository.Enums.Log.LogEnum.Exception.ToString(), string.Empty, filename);
-        //     throw;
-        // }
+        }
+        catch (System.Exception)
+        {
+            await _logService.LogAsync("Download file.", int.Parse(id!), Repository.Enums.Log.LogEnum.Exception.ToString(), string.Empty, filename);
+            throw;
+        }
 
     }
 
@@ -183,9 +183,9 @@ public class TaskActionController : ControllerBase
     [ApiExplorerSettings(IgnoreApi = true)]
     public async Task<IActionResult> DownloadFilesAsZip(int id, string userId)
     {
-        // string? authUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-        // try
-        // {
+        string? authUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        try
+        {
             var submittedData = await _taskActionService.GetTaskFileData(id);
             if (submittedData == null || !submittedData.Any())
                 return NotFound("No file found");
@@ -231,13 +231,13 @@ public class TaskActionController : ControllerBase
             var zipBytes = await System.IO.File.ReadAllBytesAsync(zipPath);
             System.IO.File.Delete(zipPath);
             
-            // await _logService.LogAsync("Download zip file.", int.Parse(authUserId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, id.ToString());
+            await _logService.LogAsync("Download zip file.", int.Parse(authUserId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, id.ToString());
             return File(zipBytes, "application/zip", $"TaskAction_{id}_Files.zip");
-        // }
-        // catch (System.Exception ex)
-        // {
-        //     await _logService.LogAsync("Download zip file.", int.Parse(authUserId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, id.ToString());
-        //     throw;
-        // }
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Download zip file.", int.Parse(authUserId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, id.ToString());
+            throw;
+        }
     }
 }

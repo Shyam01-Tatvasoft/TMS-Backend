@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
@@ -40,23 +42,33 @@ public class AuthenticationController : ControllerBase
             _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
             return BadRequest(_response);
         }
-        var user = await _autService.LoginAsync(dto);
-        if (user == null)
+        try
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { "Invalid Credentials" };
+            var user = await _autService.LoginAsync(dto);
+            if (user == null)
+            {
+                _response.IsSuccess = false;
+                _response.ErrorMessage = new List<string> { "Invalid Credentials" };
+                return Ok(_response);
+            }
+            var token = await _jwtService.GenerateToken(user.Email.ToString(), dto.RememberMe);
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+            _response.StatusCode = System.Net.HttpStatusCode.OK;
+            _response.IsSuccess = true;
+            _response.Result = new { token, loginUser = user };
+            await _logService.LogAsync("User logged in.", user.Id, Repository.Enums.Log.LogEnum.Login.ToString(), string.Empty, dto.Email);
             return Ok(_response);
         }
-        var token = await _jwtService.GenerateToken(user.Email.ToString(), dto.RememberMe);
-
-        using (var client = new HttpClient())
+        catch (System.Exception ex)
         {
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            await _logService.LogAsync("Login failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, dto.Email);
+            throw;
         }
-        _response.StatusCode = System.Net.HttpStatusCode.OK;
-        _response.IsSuccess = true;
-        _response.Result = new { token, loginUser = user };
-        return Ok(_response);
+
     }
 
 
@@ -73,34 +85,45 @@ public class AuthenticationController : ControllerBase
             _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
             return BadRequest(_response);
         }
-        var result = await _autService.RegisterAsync(dto);
-        if (result == "Email already registered.")
+        try
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { result }; ;
-            return BadRequest(_response);
+            var (message, id) = await _autService.RegisterAsync(dto);
+            if (message == "Email already registered.")
+            {
+                _response.IsSuccess = false;
+                _response.ErrorMessage = new List<string> { message }; ;
+                return BadRequest(_response);
+            }
+            else if (message == "Username already exist.")
+            {
+                _response.IsSuccess = false;
+                _response.ErrorMessage = new List<string> { "Username is not available." };
+                return BadRequest(_response);
+            }
+            _response.StatusCode = HttpStatusCode.OK;
+            _response.IsSuccess = true;
+            _response.Result = "Registered Successfully";
+            await _logService.LogAsync("User registered.", id, Repository.Enums.Log.LogEnum.Register.ToString(), string.Empty, dto.Email);
+            return Ok(_response);
         }
-        else if (result == "Username already exist.")
+        catch (System.Exception ex)
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { "Username is not available." };
-            return BadRequest(_response);
+            await _logService.LogAsync("Register failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, dto.Email);
+            throw;
         }
-        _response.StatusCode = HttpStatusCode.OK;
-        _response.IsSuccess = true;
-        _response.Result = "Registered Successfully";
-        return Ok(_response);
     }
 
     [HttpPost("logout")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult<APIResponse> Logout()
+    public async Task<ActionResult<APIResponse>> Logout()
     {
+        string userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "Unknown";
         Response.Cookies.Delete("AuthToken");
         _response.IsSuccess = true;
         _response.Result = "Logged out successfully.";
+        await _logService.LogAsync("User logged out.", int.Parse(userId), Repository.Enums.Log.LogEnum.Logout.ToString(), string.Empty, string.Empty);
         return Ok(_response);
     }
 
@@ -151,18 +174,28 @@ public class AuthenticationController : ControllerBase
             return BadRequest(_response);
         }
 
-        var result = await _autService.ResetPasswordAsync(email, dto);
-        if (!result)
+        try
         {
-            _response.StatusCode = HttpStatusCode.BadRequest;
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { "Failed to reset password" };
-            return BadRequest(_response);
-        }
+            var result = await _autService.ResetPasswordAsync(email, dto);
+            if (result == null)
+            {
+                _response.StatusCode = HttpStatusCode.BadRequest;
+                _response.IsSuccess = false;
+                _response.ErrorMessage = new List<string> { "Failed to reset password" };
+                await _logService.LogAsync("Setup password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(),"", JsonSerializer.Serialize(dto));
+                return BadRequest(_response);
+            }
 
-        _response.StatusCode = HttpStatusCode.OK;
-        _response.Result = "Password reset successfully";
-        return Ok(_response);
+            _response.StatusCode = HttpStatusCode.OK;
+            _response.Result = "Password reset successfully";
+            await _logService.LogAsync("Setup password successfully.", result.Id, Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(dto));
+            return Ok(_response);
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Setup password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(),ex.StackTrace, JsonSerializer.Serialize(dto));
+            throw;
+        }
     }
 
     [HttpPost("forgot-password")]
@@ -178,18 +211,27 @@ public class AuthenticationController : ControllerBase
             return BadRequest(_response);
         }
 
-        var result = await _autService.ForgotPassword(dto.Email);
-        if (result == "User not Exist.")
+        try
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { result };
-            return BadRequest(_response);
-        }
+            var (message, id) = await _autService.ForgotPassword(dto.Email);
+            if (message == "User not Exist.")
+            {
+                _response.IsSuccess = false;
+                _response.ErrorMessage = new List<string> { message };
+                return BadRequest(_response);
+            }
 
-        _response.StatusCode = HttpStatusCode.OK;
-        _response.IsSuccess = true;
-        _response.Result = "Mail sent successfully";
-        return Ok(_response);
+            _response.StatusCode = HttpStatusCode.OK;
+            _response.IsSuccess = true;
+            _response.Result = "Mail sent successfully";
+            await _logService.LogAsync("Forgot password.", id, Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, dto.Email);
+            return Ok(_response);
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Forgot password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, dto.Email);
+            throw;
+        }
     }
 
 

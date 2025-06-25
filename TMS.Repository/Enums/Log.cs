@@ -16,6 +16,12 @@ public class Log
         [Description("Read")]
         Read = 5,
         [Description("Error")]
-        Error = 6
+        Error = 6,
+        [Description("Login")]
+        Login = 7,
+        [Description("Logout")]
+        Logout = 8,
+        [Description("Register")]
+        Register = 9,
     }
 }

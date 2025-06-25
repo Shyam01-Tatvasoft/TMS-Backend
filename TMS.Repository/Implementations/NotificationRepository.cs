@@ -47,4 +47,24 @@ public class NotificationRepository : INotificationRepository
             return -1;
         }
     }
+
+    public async Task<int> MarkAllAsReadAsync(int userId)
+    {
+        List<Notification> notifications = await _context.Notifications
+            .Where(n => n.FkUserId == userId && n.IsRead == false)
+            .ToListAsync();
+
+        if (notifications.Count == 0)
+        {
+            return 0; // No notifications to mark as read
+        }
+
+        foreach (var notification in notifications)
+        {
+            notification.IsRead = true;
+        }
+
+        await _context.SaveChangesAsync();
+        return notifications.Count; // Return the number of notifications marked as read
+    }
 }

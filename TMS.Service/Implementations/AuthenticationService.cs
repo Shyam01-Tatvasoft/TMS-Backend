@@ -24,12 +24,12 @@ public class AuthenticationService : IAuthenticationService
 
     }
 
-    public async Task<string> RegisterAsync(UserRegisterDto dto)
+    public async Task<(string,int)> RegisterAsync(UserRegisterDto dto)
     {
         var existing = await _userRepository.GetByEmailAsync(dto.Email);
-        if (existing != null) return "Email already registered.";
+        if (existing != null) return ("Email already registered.", existing.Id);
         var existingUsername = await _userRepository.GetByUsernameAsync(dto.Username);
-        if (existingUsername != null) return "Username already exist.";
+        if (existingUsername != null) return ("Username already exist.", existingUsername.Id);
 
         User user = new User
         {
@@ -51,23 +51,23 @@ public class AuthenticationService : IAuthenticationService
         string subject = "Password setup request";
         string body = GetEmailTemplate(resetLink, "SetupPasswordTemplate");
         SendMail(dto.Email, subject, body);
-        return "Account created successfully.";
+        return ("Account created successfully.",user.Id);
     }
 
-    public async Task<string> ForgotPassword(string email)
+    public async Task<(string,int)> ForgotPassword(string email)
     {
         var existing = await _userRepository.GetByEmailAsync(email);
-        if (existing == null) return "User not Exist.";
+        if (existing == null) return ("User not Exist.", 0);
 
         string resetToken = GenerateResetToken(email);
         var resetLink = "http://127.0.0.1:5500/assets/templates/ResetPassword.html?token=" + resetToken;
         string subject = "Password reset request";
         string body = GetEmailTemplate(resetLink, "ForgotPasswordTemplate");
         SendMail(email, subject, body);
-        return "Mail sent successfully.";
+        return ("Mail sent successfully.",existing.Id);
     }
 
-    public async Task<bool> ResetPasswordAsync(string email, ResetPasswordDto dto)
+    public async Task<User> ResetPasswordAsync(string email, ResetPasswordDto dto)
     {
         User? user = await _userRepository.GetByEmailAsync(email);
         user.Password = HashPassword(dto.NewPassword);
@@ -86,7 +86,10 @@ public class AuthenticationService : IAuthenticationService
             Username = user.Username
         };
         bool response = await _userRepository.UpdateAsync(userData);
-        return response;
+        if(response)
+            return user;
+        else
+            return null!;
     }
 
     public async Task<UserDto?> LoginAsync(UserLoginDto dto)

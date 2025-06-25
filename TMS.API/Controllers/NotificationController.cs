@@ -5,8 +5,8 @@ using TMS.Service.Interfaces;
 
 namespace TMS.API.Controllers;
 
-[EnableCors("AllowSpecificOrigin")]
 [Route("api/notification")]
+[EnableCors("AllowSpecificOrigin")]
 [ApiController]
 public class NotificationController : Controller
 {
@@ -57,6 +57,26 @@ public class NotificationController : Controller
         catch (System.Exception ex)
         {
             await _logService.LogAsync("Mark as read notification.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), ex.StackTrace, id.ToString());
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    [HttpPut("mark-all-read/{userId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> MarkAllAsRead(int userId)
+    {
+        string? userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        try
+        {
+            string result = await _notificationService.MarkAllAsRead(userId);
+            await _logService.LogAsync("Mark all notifications as read.", int.Parse(userIdClaim!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, userId.ToString());
+            return Ok(result);
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Mark all notifications as read.", int.Parse(userIdClaim!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, userId.ToString());
             return StatusCode(500, "Internal server error");
         }
     }

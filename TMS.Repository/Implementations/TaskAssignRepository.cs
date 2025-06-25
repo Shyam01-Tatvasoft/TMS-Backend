@@ -82,8 +82,8 @@ public class TaskAssignRepository : ITaskAssignRepository
                 CreatedAt = taskAssign.CreatedAt,
                 TaskName = taskAssign.FkTask.Name ?? string.Empty,
                 SubTaskName = taskAssign.FkSubtask.Name ?? string.Empty,
-                TaskActionId = ((Status.StatusEnum?)taskAssign.Status == Status.StatusEnum.Review || 
-                (Status.StatusEnum)taskAssign.Status == Status.StatusEnum.Completed) 
+                TaskActionId = ((Status.StatusEnum?)taskAssign.Status == Status.StatusEnum.Review ||
+                (Status.StatusEnum)taskAssign.Status == Status.StatusEnum.Completed)
                 ? _context.TaskActions
                     .Where(ta => ta.FkTaskId == taskAssign.Id)
                     .Select(ta => ta.Id)
@@ -117,4 +117,27 @@ public class TaskAssignRepository : ITaskAssignRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end)
+    {
+        List<TaskAssignDto> taskList = await _context.TaskAssigns
+            .Where(t => t.DueDate.Date > start.Date && t.DueDate.Date < end.Date)
+            .Include(t => t.FkUser)
+            .Include(t => t.FkTask)
+            .Include(t => t.FkSubtask)
+            .Select(taskAssign => new TaskAssignDto
+            {
+            Id = taskAssign.Id,
+            UserName = taskAssign.FkUser.FirstName + " " + taskAssign.FkUser.LastName,
+            Description = taskAssign.Description,
+            DueDate = taskAssign.DueDate,
+            Status = ((Status.StatusEnum)taskAssign.Status).ToDescription(),
+            Priority = ((Priority.PriorityEnum)taskAssign.Priority.Value).ToString(),
+            CreatedAt = taskAssign.CreatedAt,
+            TaskName = taskAssign.FkTask.Name ?? string.Empty,
+            SubTaskName = taskAssign.FkSubtask.Name ?? string.Empty
+            })
+            .ToListAsync();
+
+        return taskList;
+    }
 }

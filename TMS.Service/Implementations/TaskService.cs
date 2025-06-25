@@ -207,4 +207,9 @@ public class TaskService : ITaskService
         await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Reassigned);
         return taskAssign;
     }
+
+    public async  Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start,DateTime end)
+    {
+        return await _taskAssignRepository.GetTasksForSchedular(start,end);
+    }
 }

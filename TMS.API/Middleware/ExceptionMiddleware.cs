@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using System.Text.Json;
 using TMS.Service.Interfaces;
 
@@ -14,7 +15,7 @@ public class ExceptionMiddleware
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext httpContext)
+    public async Task InvokeAsync(HttpContext httpContext, ILogService logService)
     {
         try
         {
@@ -22,22 +23,18 @@ public class ExceptionMiddleware
         }
         catch (Exception ex)
         {
-            await HandleExceptionAsync(httpContext, ex);
+            await HandleExceptionAsync(httpContext, ex, logService);
         }
     }
 
-    private async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private async Task HandleExceptionAsync(HttpContext context, Exception exception, ILogService logService)
     {
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-
-        // Log to database
-        // await _logService.LogExceptionAsync(new ExceptionLog
-        // {
-        //     Message = exception.Message,
-        //     StackTrace = exception.StackTrace,
-        // });
-        Console.WriteLine(exception.Message);
+        string? userId = context.User.Claims
+             .FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        await logService.LogAsync("System Exception", null, Repository.Enums.Log.LogEnum.Exception.ToString(), exception.StackTrace, null);
+        
 
         var result = JsonSerializer.Serialize(new
         {

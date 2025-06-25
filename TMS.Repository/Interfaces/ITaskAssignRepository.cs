@@ -9,4 +9,5 @@ public interface ITaskAssignRepository
     public Task<TaskAssign?> GetTaskAssignAsync(int id);
     public System.Threading.Tasks.Task AddTaskAssignAsync(TaskAssign task);
     public System.Threading.Tasks.Task UpdateTaskAssignAsync(TaskAssign task);
+    public Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end);
 }

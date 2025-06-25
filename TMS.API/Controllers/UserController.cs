@@ -53,7 +53,16 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetFilteredUsers()
     {
-        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
+        if(role != "Admin")
+        {
+            return Forbid();
+        }
         try
         {
             var draw = Request.Form["draw"].FirstOrDefault();

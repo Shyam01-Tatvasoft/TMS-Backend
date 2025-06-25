@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+namespace TMS.Repository.Dtos;
 
-namespace TMS.Repository.Data;
-
-public partial class Log
+public class LogDto
 {
     public int Id { get; set; }
 
-    public int? FkUserId { get; set; }
+    public string? FkUserId { get; set; }
 
     public DateTime? Date { get; set; }
 
@@ -17,5 +14,5 @@ public partial class Log
 
     public string? Message { get; set; }
 
-    public string? Stacktrash { get; set; }
+    public string? StackTrash { get; set; }
 }
