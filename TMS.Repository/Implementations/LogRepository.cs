@@ -5,7 +5,7 @@ using TMS.Repository.Interfaces;
 
 namespace TMS.Repository.Implementations;
 
-public class LogRepository: ILogRepository
+public class LogRepository : ILogRepository
 {
     private readonly TmsContext _context;
 
@@ -21,16 +21,26 @@ public class LogRepository: ILogRepository
         return log.Id;
     }
 
-    public async Task<(List<LogDto>,int count)> GetAllLogsAsync(int skip, int take, string? search, string? sorting, string? sortDirection)
+    public async Task<(List<LogDto>, int count)> GetAllLogsAsync(int skip, int take, string? search, string? sorting, string? sortDirection, string filterBy)
     {
         var query = _context.Logs
-            // .Include(l => l.FkUser)
             .AsQueryable();
+
+        if (!string.IsNullOrEmpty(filterBy))
+        {
+            filterBy = filterBy.ToLower();
+            query = filterBy switch
+            {
+                "exception" => query.Where(l => l.Action == "Exception"),
+                "actions" => query.Where(l => l.Action != "Exception"),
+                _ => query
+            };
+        }
 
         if (!string.IsNullOrEmpty(search))
         {
             search = search.ToLower();
-            query = query.Where(l => l.Message.ToLower().Contains(search) || 
+            query = query.Where(l => l.Message.ToLower().Contains(search) ||
                                      l.Action.ToLower().Contains(search) ||
                                      l.Data.ToLower().Contains(search));
         }
@@ -42,7 +52,6 @@ public class LogRepository: ILogRepository
                 query = sorting switch
                 {
                     "1" => query.OrderBy(l => l.Date),
-                    // "2" => query.OrderBy(l => l.FkUser.FirstName).ThenBy(l => l.FkUser.LastName),
                     _ => query.OrderBy(l => l.Id)
                 };
             }
@@ -51,7 +60,6 @@ public class LogRepository: ILogRepository
                 query = sorting switch
                 {
                     "1" => query.OrderByDescending(l => l.Date),
-                    // "2" => query.OrderByDescending(l => l.FkUser.FirstName).ThenByDescending(l => l.FkUser.LastName),
                     _ => query.OrderByDescending(l => l.Id)
                 };
             }
@@ -61,17 +69,16 @@ public class LogRepository: ILogRepository
             query = query.OrderByDescending(l => l.Id);
         }
         int count = await query.CountAsync();
-        List<LogDto> logs =  await query.Skip(skip).Take(take)
+        List<LogDto> logs = await query.Skip(skip).Take(take)
         .Select(l => new LogDto
         {
             Id = l.Id,
             Message = l.Message,
             Date = l.Date,
             Action = l.Action,
-            Data = l.Data,
+            Data = null,
             StackTrash = l.Stacktrash,
             FkUserId = l.FkUserId == 1 ? "Admin" : "User",
-            // UserName = l.FkUser.FirstName + " " + l.FkUser.LastName
         }).ToListAsync();
         return (logs, count);
     }
@@ -79,7 +86,6 @@ public class LogRepository: ILogRepository
     public async Task<Log?> GetLogByIdAsync(int id)
     {
         return await _context.Logs
-            // .Include(l => l.FkUser)
             .FirstOrDefaultAsync(l => l.Id == id);
     }
 }

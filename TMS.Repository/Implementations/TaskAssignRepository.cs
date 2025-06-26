@@ -117,25 +117,43 @@ public class TaskAssignRepository : ITaskAssignRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end)
+    public async Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end, string role, int userId)
     {
+        var startUnspecified = DateTime.SpecifyKind(start.Date, DateTimeKind.Unspecified);
+        var endUnspecified = DateTime.SpecifyKind(end.Date, DateTimeKind.Unspecified);
+
         List<TaskAssignDto> taskList = await _context.TaskAssigns
-            .Where(t => t.DueDate.Date > start.Date && t.DueDate.Date < end.Date)
+            .Where(t => (role == "Admin") || (role == "User" && t.FkUserId == userId))
+            .Where(t => t.DueDate.Date > startUnspecified && t.DueDate.Date < endUnspecified)
             .Include(t => t.FkUser)
             .Include(t => t.FkTask)
             .Include(t => t.FkSubtask)
             .Select(taskAssign => new TaskAssignDto
             {
-            Id = taskAssign.Id,
-            UserName = taskAssign.FkUser.FirstName + " " + taskAssign.FkUser.LastName,
-            Description = taskAssign.Description,
-            DueDate = taskAssign.DueDate,
-            Status = ((Status.StatusEnum)taskAssign.Status).ToDescription(),
-            Priority = ((Priority.PriorityEnum)taskAssign.Priority.Value).ToString(),
-            CreatedAt = taskAssign.CreatedAt,
-            TaskName = taskAssign.FkTask.Name ?? string.Empty,
-            SubTaskName = taskAssign.FkSubtask.Name ?? string.Empty
+                Id = taskAssign.Id,
+                UserName = taskAssign.FkUser.Username,
+                Description = taskAssign.Description,
+                DueDate = taskAssign.DueDate,
+                Status = ((Status.StatusEnum)taskAssign.Status).ToDescription(),
+                Priority = ((Priority.PriorityEnum)taskAssign.Priority.Value).ToString(),
+                CreatedAt = taskAssign.CreatedAt,
+                CompletedAt = _context.TaskActions.FirstOrDefault(a => a.FkTaskId == taskAssign.Id)!.SubmittedAt,
+                TaskName = taskAssign.FkTask.Name ?? string.Empty,
+                SubTaskName = taskAssign.FkSubtask.Name ?? string.Empty
             })
+            .ToListAsync();
+
+        return taskList;
+    }
+
+    public async Task<List<TaskAssign>> GetDueTasksAsync()
+    {
+        var tomorrow = DateTime.Today.AddDays(1);
+
+        List<TaskAssign> taskList = await _context.TaskAssigns.Where(t => t.DueDate.Date == tomorrow &&
+                t.Status != (int)Status.StatusEnum.Completed)
+            .Include(t => t.FkUser)
+            .Include(t => t.TaskActions)
             .ToListAsync();
 
         return taskList;

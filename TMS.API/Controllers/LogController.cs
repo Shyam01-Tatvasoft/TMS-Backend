@@ -44,9 +44,9 @@ public class LogController : ControllerBase
             int skip = start != null ? Convert.ToInt32(start) : 0;
             var sorting = Request.Form["order[0][column]"].FirstOrDefault();
             var sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
+            var filterBy = Request.Form["filterBy[value]"].FirstOrDefault();
 
-
-            var (logs, count) = await _logService.GetAllLogsAsync(skip, pageSize, searchValue, sorting, sortDirection);
+            var (logs, count) = await _logService.GetAllLogsAsync(skip, pageSize, searchValue, sorting, sortDirection, filterBy ?? string.Empty);
 
             var result = new
             {

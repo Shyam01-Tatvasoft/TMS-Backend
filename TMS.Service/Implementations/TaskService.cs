@@ -106,7 +106,7 @@ public class TaskService : ITaskService
             FkTaskId = task.FkTaskId,
             FkSubtaskId = task.FkSubtaskId,
             TaskData = JsonSerializer.Serialize(task.TaskData),
-            DueDate = task.DueDate,
+            DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59),
             Status = task.Status,
             Priority = task.Priority,
             CreatedAt = DateTime.Now,
@@ -138,7 +138,7 @@ public class TaskService : ITaskService
 
         existingTask.Description = task.Description;
         existingTask.TaskData = JsonSerializer.Serialize(task.TaskData);
-        existingTask.DueDate = task.DueDate;
+        existingTask.DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
         existingTask.Status = task.Status;
         existingTask.Priority = task.Priority;
 
@@ -208,8 +208,8 @@ public class TaskService : ITaskService
         return taskAssign;
     }
 
-    public async  Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start,DateTime end)
+    public async Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end, string role, int userId)
     {
-        return await _taskAssignRepository.GetTasksForSchedular(start,end);
+        return await _taskAssignRepository.GetTasksForSchedular(start, end, role, userId);
     }
 }

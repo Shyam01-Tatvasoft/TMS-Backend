@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace TMS.Repository.Dtos;
 
 public class LogDto
@@ -10,7 +12,7 @@ public class LogDto
 
     public string? Action { get; set; }
 
-    public string? Data { get; set; }
+    public JsonElement? Data { get; set; }
 
     public string? Message { get; set; }
 

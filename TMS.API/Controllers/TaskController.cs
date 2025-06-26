@@ -280,24 +280,28 @@ public class TaskController : ControllerBase
     [ProducesResponseType(400)]
     public async Task<IActionResult> GetTaskForSchedular(DateTime start, DateTime end)
     {
-        // if (start > end || start < DateTime.Now || end < DateTime.Now)  
-        // {
-        //     return BadRequest("Invalid date range provided.");
-        // }
-        int userId = int.Parse(User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "0");
+        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+        int id = int.Parse(userId!);
+        if (email == null || role == null || userId == null)
+            return Unauthorized();
         try
         {
-            var tasks = await _taskService.GetTasksForSchedular(start,end);
+            var tasks = await _taskService.GetTasksForSchedular(start, end, role, id);
             if (tasks == null || !tasks.Any())
             {
                 return NotFound("No tasks found for the specified date range.");
             }
-            await _logService.LogAsync("Get tasks for schedular.", userId, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, $"{start} to {end}");
+            await _logService.LogAsync("Get tasks for schedular.", id, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, $"{start} to {end}");
             return Ok(tasks);
         }
         catch (Exception ex)
         {
-            await _logService.LogAsync("Get tasks for schedular.", userId, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, $"{start} to {end}");
+            await _logService.LogAsync("Get tasks for schedular.", id, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, $"{start} to {end}");
             return StatusCode(500, _response);
         }
     }

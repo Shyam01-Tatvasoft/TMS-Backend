@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Repository.Interfaces;
@@ -29,9 +30,9 @@ public class LogService : ILogService
         return await _logRepository.AddLogAsync(logEntry);
     }
 
-    public async Task<(List<LogDto>,int count)> GetAllLogsAsync(int skip, int take, string? search, string? sorting, string? sortDirection)
+    public async Task<(List<LogDto>,int count)> GetAllLogsAsync(int skip, int take, string? search, string? sorting, string? sortDirection, string filterBy)
     {
-        return await _logRepository.GetAllLogsAsync(skip, take, search, sorting, sortDirection);
+        return await _logRepository.GetAllLogsAsync(skip, take, search, sorting, sortDirection, filterBy);
     }
 
     public async Task<LogDto?> GetLogByIdAsync(int id)
@@ -54,7 +55,7 @@ public class LogService : ILogService
             FkUserId = log.FkUserId == 1 ? "Admin" : "User",
             Date = log.Date,
             Action = log.Action,
-            Data = log.Data,
+            Data = JsonSerializer.Deserialize<JsonElement>(log.Data!),
             StackTrash = log.Stacktrash
         };
 

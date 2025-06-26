@@ -14,5 +14,7 @@ public class Notification
         Approved = 3,
         [Description("Re Assigned")]
         Reassigned = 4,
+        [Description("Reminder")]
+        Reminder = 5,
     }
 }

@@ -1,4 +1,6 @@
 using System.Text;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -43,6 +45,8 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IHolidayService, HolidayService>();
 builder.Services.AddScoped<ITaskActionService, TaskActionService>();
 builder.Services.AddScoped<ILogService, LogService>();
+// builder.Services.AddScoped<ITaskReminderService, TaskReminderService>();
+// builder.Services.AddScoped<IReminderService,ReminderService>();
 builder.Services.AddHttpClient<HolidayService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -101,6 +105,16 @@ builder.Services.AddSignalR();
         };
     });
 
+// builder.Services.AddHangfireServer();
+
+// builder.Services.AddHangfire(configuration => configuration
+//     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+//     .UseSimpleAssemblyNameTypeSerializer()
+//     .UseRecommendedSerializerSettings()
+//     .UsePostgreSqlStorage(builder.Configuration.GetConnectionString("TMSDbConnection")));
+
+
+
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -141,6 +155,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+// recurringJobManager.AddOrUpdate<TaskReminderService>(
+//     "DailyTaskDueReminder",
+//     service => service.DueDateReminderService(),
+//     Cron.Daily
+// );
+
+// app.UseHangfireDashboard("/dashboardHangfier");
+// BackgroundJob.Enqueue(()=> Console.WriteLine("My first Hangfire Job !"));
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseRouting();
 app.UseCors("AllowSpecificOrigin");
@@ -153,6 +177,7 @@ app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
     endpoints.MapHub<NotificationHub>("/notificationHub");
+    // endpoints.MapHub<ReminderService>("/reminderHub");
 });
 
 app.Run();
