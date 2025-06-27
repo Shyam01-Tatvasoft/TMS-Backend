@@ -51,7 +51,7 @@ public class TaskActionController : ControllerBase
             {
                 return StatusCode(500, "Failed to add task action.");
             }
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
+            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
             await _logService.LogAsync("Perform email task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             return Ok(taskAction);
         }
@@ -81,7 +81,7 @@ public class TaskActionController : ControllerBase
             {
                 return StatusCode(500, "Failed to add task action.");
             }
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
+            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
             await _logService.LogAsync("Perform upload file task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             return Ok(taskAction);
         }

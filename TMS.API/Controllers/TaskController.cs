@@ -115,7 +115,7 @@ public class TaskController : ControllerBase
             }
             string? userId = taskDto.FkUserId.ToString();
             string message = "New Task Assigned!";
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", userId, message);
+            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", userId, message);
             await _logService.LogAsync("Add task.", int.Parse(Id!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(taskDto));
             return Created($"/api/tasks/", result.id);
         }
@@ -224,7 +224,7 @@ public class TaskController : ControllerBase
             }
             string? taskUserId = result.FkUserId.ToString();
             string message = "Your Task is Approved !";
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId, message);
+            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId, message);
             await _logService.LogAsync("Approve task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, string.Empty);
             return Ok("Task approved successfully.");
         }
@@ -264,7 +264,7 @@ public class TaskController : ControllerBase
             }
             string? taskUserId = result.FkUserId.ToString();
             string message = "Your Task is Reassigned !";
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId, message);
+            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId, message);
             await _logService.LogAsync("Reassign tasks.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, string.Empty);
             return Ok("Task reassigned successfully.");
         }

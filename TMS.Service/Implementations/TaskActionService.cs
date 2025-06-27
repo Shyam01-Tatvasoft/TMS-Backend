@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.SignalR;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Repository.Enums;
@@ -16,14 +17,15 @@ public class TaskActionService : ITaskActionService
     private readonly ITaskAssignRepository _taskAssignRepository;
     private readonly INotificationService _notificationService;
     private readonly IUserService _userService;
-
-    public TaskActionService(ITaskActionRepository taskActionRepository, IEmailService emailService, ITaskAssignRepository taskAssignRepository, INotificationService notificationRepository, IUserService userService)
+    private readonly IHubContext<ReminderHub> _hubContext;
+    public TaskActionService(ITaskActionRepository taskActionRepository, IEmailService emailService, ITaskAssignRepository taskAssignRepository, INotificationService notificationRepository, IUserService userService, IHubContext<ReminderHub> hubContext)
     {
         _taskActionRepository = taskActionRepository;
         _emailService = emailService;
         _taskAssignRepository = taskAssignRepository;
         _notificationService = notificationRepository;
         _userService = userService;
+        _hubContext = hubContext;
     }
 
     public async Task<List<TaskAction>> GetAllTaskActionsAsync()
@@ -95,6 +97,7 @@ public class TaskActionService : ITaskActionService
 
         //send notification to admin
         await _notificationService.AddNotification(1, emailTask.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
+        await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
         return taskAction.Id;
     }
 
@@ -173,7 +176,7 @@ public class TaskActionService : ITaskActionService
         string emailBodyAdmin = await GetTaskEmailBody(dto.FkTaskId, "TaskPerformedTemplate");
         _emailService.SendMail("admin@gmail.com", "Task Performed", emailBodyAdmin);
         await _notificationService.AddNotification(1, dto.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
-
+        await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
         return taskAction.Id;
     }
 

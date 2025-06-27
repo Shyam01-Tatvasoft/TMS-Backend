@@ -151,7 +151,7 @@ public class TaskAssignRepository : ITaskAssignRepository
         var tomorrow = DateTime.Today.AddDays(1);
 
         List<TaskAssign> taskList = await _context.TaskAssigns.Where(t => t.DueDate.Date == tomorrow &&
-                t.Status != (int)Status.StatusEnum.Completed)
+                t.Status != (int)Status.StatusEnum.Completed && t.Status != (int)Status.StatusEnum.Review && t.Status != (int)Status.StatusEnum.Cancelled)
             .Include(t => t.FkUser)
             .Include(t => t.TaskActions)
             .ToListAsync();

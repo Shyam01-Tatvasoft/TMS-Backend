@@ -34,6 +34,9 @@ builder.Services.AddDbContext<TmsContext>(options => options.UseNpgsql(builder.C
 
 builder.Services.AddControllers();
 
+builder.Services.AddHangfire(x =>
+    x.UsePostgreSqlStorage(builder.Configuration.GetConnectionString("TMSDbConnection")));
+builder.Services.AddHangfireServer();
 
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IJWTService, JWTService>();
@@ -45,8 +48,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IHolidayService, HolidayService>();
 builder.Services.AddScoped<ITaskActionService, TaskActionService>();
 builder.Services.AddScoped<ILogService, LogService>();
-// builder.Services.AddScoped<ITaskReminderService, TaskReminderService>();
-// builder.Services.AddScoped<IReminderService,ReminderService>();
+builder.Services.AddScoped<ITaskReminderService, TaskReminderService>();
 builder.Services.AddHttpClient<HolidayService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -105,16 +107,6 @@ builder.Services.AddSignalR();
         };
     });
 
-// builder.Services.AddHangfireServer();
-
-// builder.Services.AddHangfire(configuration => configuration
-//     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-//     .UseSimpleAssemblyNameTypeSerializer()
-//     .UseRecommendedSerializerSettings()
-//     .UsePostgreSqlStorage(builder.Configuration.GetConnectionString("TMSDbConnection")));
-
-
-
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -156,15 +148,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
-// recurringJobManager.AddOrUpdate<TaskReminderService>(
-//     "DailyTaskDueReminder",
-//     service => service.DueDateReminderService(),
-//     Cron.Daily
-// );
+app.UseHangfireDashboard("/dashboardHangfire");
 
-// app.UseHangfireDashboard("/dashboardHangfier");
-// BackgroundJob.Enqueue(()=> Console.WriteLine("My first Hangfire Job !"));
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseRouting();
 app.UseCors("AllowSpecificOrigin");
@@ -177,7 +162,19 @@ app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
     endpoints.MapHub<NotificationHub>("/notificationHub");
-    // endpoints.MapHub<ReminderService>("/reminderHub");
+    endpoints.MapHub<ReminderHub>("/reminderHub");
 });
+
+using (var scope = app.Services.CreateScope())
+{
+    var jobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+    var reminderService = scope.ServiceProvider.GetRequiredService<ITaskReminderService>();
+
+    jobManager.AddOrUpdate(
+        "daily-task-reminder",
+        () => reminderService.DueDateReminderService(),
+        "56 17 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
+}
 
 app.Run();

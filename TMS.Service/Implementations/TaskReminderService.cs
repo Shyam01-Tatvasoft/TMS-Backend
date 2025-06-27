@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using TMS.Repository.Data;
+using TMS.Repository.Enums;
 using TMS.Repository.Interfaces;
 using TMS.Service.Interfaces;
 
@@ -8,15 +9,17 @@ namespace TMS.Service.Implementations;
 public class TaskReminderService : ITaskReminderService
 {
     private readonly ITaskAssignRepository _taskAssignRepository;
-    private readonly IHubContext<ReminderService> _hubContext;
+    private readonly IHubContext<ReminderHub> _hubContext;
     private readonly INotificationService _notificationService;
+    private readonly IEmailService _emailService;
     private readonly ILogService _logService;
-    public TaskReminderService(ITaskAssignRepository taskAssignRepository, IHubContext<ReminderService> hubContext, INotificationService notificationService, ILogService logService)
+    public TaskReminderService(ITaskAssignRepository taskAssignRepository, IHubContext<ReminderHub> hubContext, INotificationService notificationService, ILogService logService, IEmailService emailService)
     {
         _taskAssignRepository = taskAssignRepository;
         _hubContext = hubContext;
         _notificationService = notificationService;
         _logService = logService;
+        _emailService = emailService;
     }
 
     public async System.Threading.Tasks.Task DueDateReminderService()
@@ -28,11 +31,36 @@ public class TaskReminderService : ITaskReminderService
             if (userId != null)
             {
                 string message = $"Reminder: Your task (ID: {task.Id}) is due tomorrow!";
-                await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, message);
-
-                
                 await _notificationService.AddNotification(task.FkUser.Id, task.Id, (int)Repository.Enums.Notification.NotificationEnum.Reminder);
+
+                await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, message);
+                string emailBodyAdmin = await GetTaskEmailBody(task.Id, "ReminderMail");
+                _emailService.SendMail(task?.FkUser?.Email!, "Task Reminder", emailBodyAdmin);
+                
             }
         }
+    }
+
+     public async Task<string> GetTaskEmailBody(int id, string templateName)
+    {
+        TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(id);
+        string templatePath = $"d:/TMS/TMS.Service/Templates/{templateName}.html";
+
+        if (!System.IO.File.Exists(templatePath))
+        {
+            return "<p>Email template not found</p>";
+        }
+
+        string emailBody = System.IO.File.ReadAllText(templatePath);
+
+        emailBody = emailBody.Replace("{{UserName}}", task?.FkUser.FirstName + " " + task.FkUser.LastName ?? "User");
+        emailBody = emailBody.Replace("{{TaskType}}", task.FkTask?.Name ?? "-");
+        emailBody = emailBody.Replace("{{SubTask}}", task.FkSubtask?.Name ?? "-");
+        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority.Value).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status.Value).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{DueDate}}", task.DueDate.ToString("dd MMM yyyy"));
+        emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
+
+        return emailBody;
     }
 }

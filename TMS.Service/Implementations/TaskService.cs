@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.AspNetCore.SignalR;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Repository.Enums;
@@ -18,8 +19,9 @@ public class TaskService : ITaskService
     private readonly IHolidayService _holidayService;
     private readonly IUserRepository _userRepository;
     private readonly ITaskActionRepository _taskActionRepository;
+    private readonly IHubContext<ReminderHub> _hubContext;
 
-    public TaskService(ITaskAssignRepository taskAssignRepository, ITaskRepository taskRepository, IEmailService emailService, INotificationService notificationService, IHolidayService holidayService, IUserRepository userRepository, ITaskActionRepository taskActionRepository)
+    public TaskService(ITaskAssignRepository taskAssignRepository, ITaskRepository taskRepository, IEmailService emailService, INotificationService notificationService, IHolidayService holidayService, IUserRepository userRepository, ITaskActionRepository taskActionRepository, IHubContext<ReminderHub> hubContext)
     {
         _taskAssignRepository = taskAssignRepository;
         _taskRepository = taskRepository;
@@ -28,6 +30,7 @@ public class TaskService : ITaskService
         _holidayService = holidayService;
         _userRepository = userRepository;
         _taskActionRepository = taskActionRepository;
+        _hubContext = hubContext;
     }
 
     public async Task<List<TaskDto>> GetAllTasksAsync()
@@ -115,6 +118,7 @@ public class TaskService : ITaskService
         await _notificationService.AddNotification((int)task.FkUserId, newTask.Id, (int)Repository.Enums.Notification.NotificationEnum.Assigned);
         string emailBody = await GetTaskEmailBody(newTask.Id);
         _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
+        await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, "New Task Assigned!");
         return (newTask.Id, "Task assigned successfully.");
     }
 
@@ -183,6 +187,7 @@ public class TaskService : ITaskService
         await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Approved);
         string emailBody = await GetTaskEmailBody(taskAssign.Id);
         _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Approved", emailBody);
+        await _hubContext.Clients.All.SendAsync("ReceiveNotification", (int)taskAssign.FkUserId!, "Your Task is Approved !");
         return taskAssign;
     }
 
@@ -205,6 +210,7 @@ public class TaskService : ITaskService
 
         // Notify user
         await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Reassigned);
+        await _hubContext.Clients.All.SendAsync("ReceiveNotification", (int)taskAssign.FkUserId!, "Your Task is Reassigned !");
         return taskAssign;
     }
 
