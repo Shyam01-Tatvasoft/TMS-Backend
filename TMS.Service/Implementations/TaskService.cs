@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
+using System.Transactions;
 using Microsoft.AspNetCore.SignalR;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
@@ -89,37 +90,47 @@ public class TaskService : ITaskService
 
     public async Task<(int id, string message)> AddTaskAssignAsync(AddTaskDto task, string role)
     {
-        User? user = await _userRepository.GetByIdAsync((int)task.FkUserId!);
-        if (user == null)
-            return (0, "User not found.");
-        if (role == "Admin" && task.Status.HasValue && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Pending && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Cancelled)
+        using TransactionScope transaction = new(TransactionScopeAsyncFlowOption.Enabled);
+        try
         {
-            return (0, "Invalid status.");
-        }
+            User? user = await _userRepository.GetByIdAsync((int)task.FkUserId!);
+            if (user == null)
+                return (0, "User not found.");
+            if (role == "Admin" && task.Status.HasValue && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Pending && (Status.StatusEnum)task?.Status.Value! != Status.StatusEnum.Cancelled)
+            {
+                return (0, "Invalid status.");
+            }
 
-        bool isHoliday = await _holidayService.IsHolidayAsync(user?.FkCountry?.IsoCode!, task.DueDate);
-        if (isHoliday)
-        {
-            return (0, $"Please assign task on another day because it's a public holiday for {user?.FirstName + " " + user?.LastName}.");
+            bool isHoliday = await _holidayService.IsHolidayAsync(user?.FkCountry?.IsoCode!, task.DueDate);
+            if (isHoliday)
+            {
+                return (0, $"Please assign task on another day because it's a public holiday for {user?.FirstName + " " + user?.LastName}.");
+            }
+            TaskAssign newTask = new()
+            {
+                Description = task.Description,
+                FkUserId = task.FkUserId,
+                FkTaskId = task.FkTaskId,
+                FkSubtaskId = task.FkSubtaskId,
+                TaskData = JsonSerializer.Serialize(task.TaskData),
+                DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59),
+                Status = task.Status,
+                Priority = task.Priority,
+                CreatedAt = DateTime.Now,
+            };
+            await _taskAssignRepository.AddTaskAssignAsync(newTask);
+            await _notificationService.AddNotification((int)task.FkUserId, newTask.Id, (int)Repository.Enums.Notification.NotificationEnum.Assigned);
+            string emailBody = await GetTaskEmailBody(newTask.Id);
+            _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, "New Task Assigned!");
+            transaction.Complete();
+            return (newTask.Id, "Task assigned successfully.");
         }
-        TaskAssign newTask = new()
+        catch (System.Exception)
         {
-            Description = task.Description,
-            FkUserId = task.FkUserId,
-            FkTaskId = task.FkTaskId,
-            FkSubtaskId = task.FkSubtaskId,
-            TaskData = JsonSerializer.Serialize(task.TaskData),
-            DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59),
-            Status = task.Status,
-            Priority = task.Priority,
-            CreatedAt = DateTime.Now,
-        };
-        await _taskAssignRepository.AddTaskAssignAsync(newTask);
-        await _notificationService.AddNotification((int)task.FkUserId, newTask.Id, (int)Repository.Enums.Notification.NotificationEnum.Assigned);
-        string emailBody = await GetTaskEmailBody(newTask.Id);
-        _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
-        await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, "New Task Assigned!");
-        return (newTask.Id, "Task assigned successfully.");
+            transaction.Dispose();
+            throw;
+        }
     }
 
     public async Task<(bool success, string message)> UpdateTaskAssignAsync(EditTaskDto task, string role)
@@ -176,42 +187,65 @@ public class TaskService : ITaskService
 
     public async Task<TaskAssign?> ApproveTask(int id)
     {
-        TaskAssign? taskAssign = await _taskAssignRepository.GetTaskAssignAsync(id);
-        if (taskAssign == null)
+        using TransactionScope transaction = new(TransactionScopeAsyncFlowOption.Enabled);
+        try
         {
-            return null;
-        }
+            TaskAssign? taskAssign = await _taskAssignRepository.GetTaskAssignAsync(id);
+            if (taskAssign == null)
+            {
+                return null;
+            }
 
-        taskAssign.Status = (int)Status.StatusEnum.Completed;
-        await _taskAssignRepository.UpdateTaskAssignAsync(taskAssign);
-        await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Approved);
-        string emailBody = await GetTaskEmailBody(taskAssign.Id);
-        _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Approved", emailBody);
-        await _hubContext.Clients.All.SendAsync("ReceiveNotification", (int)taskAssign.FkUserId!, "Your Task is Approved !");
-        return taskAssign;
+            taskAssign.Status = (int)Status.StatusEnum.Completed;
+            await _taskAssignRepository.UpdateTaskAssignAsync(taskAssign);
+            await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Approved);
+
+            string emailBody = await GetTaskEmailBody(taskAssign.Id);
+            _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Approved", emailBody);
+
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", (int)taskAssign.FkUserId!, "Your Task is Approved !");
+
+            transaction.Complete();
+            return taskAssign;
+        }
+        catch (System.Exception)
+        {
+            transaction.Dispose();
+            throw;
+        }
     }
 
     public async Task<TaskAssign> ReassignTask(ReassignTaskDto dto)
     {
-        TaskAssign? taskAssign = await _taskAssignRepository.GetTaskAssignAsync(dto.TaskId);
-        if (taskAssign == null)
+        using TransactionScope transaction = new(TransactionScopeAsyncFlowOption.Enabled);
+        try
         {
-            throw new Exception("Task not found.");
+            TaskAssign? taskAssign = await _taskAssignRepository.GetTaskAssignAsync(dto.TaskId);
+            if (taskAssign == null)
+            {
+                throw new Exception("Task not found.");
+            }
+
+            taskAssign.Description = dto.Comments;
+            taskAssign.Status = (int)Status.StatusEnum.Pending;
+
+            await _taskAssignRepository.UpdateTaskAssignAsync(taskAssign);
+
+            // Reassign task email
+            string emailBody = await GetTaskEmailBody(taskAssign.Id, "TaskReassignedTemplate");
+            _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Reassigned", emailBody);
+
+            // Notify user
+            await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Reassigned);
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", (int)taskAssign.FkUserId!, "Your Task is Reassigned !");
+            transaction.Complete();
+            return taskAssign;
         }
-
-        taskAssign.Description = dto.Comments;
-        taskAssign.Status = (int)Status.StatusEnum.Pending;
-
-        await _taskAssignRepository.UpdateTaskAssignAsync(taskAssign);
-
-        // Reassign task email
-        string emailBody = await GetTaskEmailBody(taskAssign.Id, "TaskReassignedTemplate");
-        _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Reassigned", emailBody);
-
-        // Notify user
-        await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Reassigned);
-        await _hubContext.Clients.All.SendAsync("ReceiveNotification", (int)taskAssign.FkUserId!, "Your Task is Reassigned !");
-        return taskAssign;
+        catch (System.Exception)
+        {
+            transaction.Dispose();
+            throw;
+        }
     }
 
     public async Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end, string role, int userId)

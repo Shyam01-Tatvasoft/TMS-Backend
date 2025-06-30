@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
 
 namespace TMS.API.Controllers;
@@ -21,7 +22,7 @@ public class LogController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> GetAllLogs()
     {
-       var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+       string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         var (email, role, userId) = _jwtService.ValidateToken(authToken);
         if (string.IsNullOrEmpty(authToken))
         {
@@ -35,16 +36,16 @@ public class LogController : ControllerBase
         {
             if (email == null || role == null || userId == null)
                 return Unauthorized();
-            var draw = Request.Form["draw"].FirstOrDefault();
-            var start = Request.Form["start"].FirstOrDefault();
-            var length = Request.Form["length"].FirstOrDefault();
-            var searchValue = Request.Form["search[value]"].FirstOrDefault();
+            string? draw = Request.Form["draw"].FirstOrDefault();
+            string? start = Request.Form["start"].FirstOrDefault();
+            string? length = Request.Form["length"].FirstOrDefault();
+            string? searchValue = Request.Form["search[value]"].FirstOrDefault();
 
             int pageSize = length != null ? Convert.ToInt32(length) : 0;
             int skip = start != null ? Convert.ToInt32(start) : 0;
-            var sorting = Request.Form["order[0][column]"].FirstOrDefault();
-            var sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
-            var filterBy = Request.Form["filterBy[value]"].FirstOrDefault();
+            string? sorting = Request.Form["order[0][column]"].FirstOrDefault();
+            string? sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
+            string? filterBy = Request.Form["filterBy[value]"].FirstOrDefault();
 
             var (logs, count) = await _logService.GetAllLogsAsync(skip, pageSize, searchValue, sorting, sortDirection, filterBy ?? string.Empty);
 
@@ -71,7 +72,7 @@ public class LogController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetLogById(int id)
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         var (email, role, userId) = _jwtService.ValidateToken(authToken);
         if (string.IsNullOrEmpty(authToken))
         {
@@ -83,7 +84,7 @@ public class LogController : ControllerBase
         }
         try
         {
-            var log = await _logService.GetLogByIdAsync(id);
+            LogDto? log = await _logService.GetLogByIdAsync(id);
             if (log == null)
             {
                 return NotFound();

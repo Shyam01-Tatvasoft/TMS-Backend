@@ -11,4 +11,5 @@ public interface ITaskAssignRepository
     public System.Threading.Tasks.Task UpdateTaskAssignAsync(TaskAssign task);
     public Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end, string role, int userId);
     public Task<List<TaskAssign>> GetDueTasksAsync();
+    public Task<List<TaskAssign>> GetOverdueTasksAsync();
 }

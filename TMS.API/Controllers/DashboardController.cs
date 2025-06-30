@@ -27,7 +27,7 @@ public class DashboardController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<APIResponse>> Dashboard()
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         if (string.IsNullOrEmpty(authToken))
         {
             _response.StatusCode = HttpStatusCode.Unauthorized;

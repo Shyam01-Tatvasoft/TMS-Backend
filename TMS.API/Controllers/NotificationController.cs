@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
 
 namespace TMS.API.Controllers;
@@ -27,7 +28,7 @@ public class NotificationController : Controller
         string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
-            var notification = await _notificationService.GetNotificationAsync(id);
+            List<NotificationDto> notification = await _notificationService.GetNotificationAsync(id);
             if (notification == null)
             {
                 return NotFound();

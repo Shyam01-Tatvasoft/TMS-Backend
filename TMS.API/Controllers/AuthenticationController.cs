@@ -44,14 +44,14 @@ public class AuthenticationController : ControllerBase
         }
         try
         {
-            var user = await _autService.LoginAsync(dto);
+            UserDto? user = await _autService.LoginAsync(dto);
             if (user == null)
             {
                 _response.IsSuccess = false;
                 _response.ErrorMessage = new List<string> { "Invalid Credentials" };
                 return Ok(_response);
             }
-            var token = await _jwtService.GenerateToken(user.Email.ToString(), dto.RememberMe);
+            string token = await _jwtService.GenerateToken(user.Email.ToString(), dto.RememberMe);
 
             using (var client = new HttpClient())
             {
@@ -166,7 +166,7 @@ public class AuthenticationController : ControllerBase
             return BadRequest(_response);
         }
 
-        var email = await _autService.ValidateResetToken(dto.Token, dto.Type);
+        string? email = await _autService.ValidateResetToken(dto.Token, dto.Type);
         if (string.IsNullOrEmpty(email))
         {
             _response.IsSuccess = false;
@@ -176,7 +176,7 @@ public class AuthenticationController : ControllerBase
 
         try
         {
-            var result = await _autService.ResetPasswordAsync(email, dto);
+            User result = await _autService.ResetPasswordAsync(email, dto);
             if (result == null)
             {
                 _response.StatusCode = HttpStatusCode.BadRequest;

@@ -14,7 +14,9 @@ public class Notification
         Approved = 3,
         [Description("Re Assigned")]
         Reassigned = 4,
-        [Description("Reminder")]
+        [Description("DueDate Reminder")]
         Reminder = 5,
+        [Description("Overdue Reminder")]
+        Overdue = 6,
     }
 }

@@ -158,4 +158,17 @@ public class TaskAssignRepository : ITaskAssignRepository
 
         return taskList;
     }
+
+    public async Task<List<TaskAssign>> GetOverdueTasksAsync()
+    {
+        var today = DateTime.Today;
+
+        List<TaskAssign> taskList = await _context.TaskAssigns.Where(t => t.DueDate.Date < today &&
+                t.Status != (int)Status.StatusEnum.Completed && t.Status != (int)Status.StatusEnum.Review && t.Status != (int)Status.StatusEnum.Cancelled)
+            .Include(t => t.FkUser)
+            .Include(t => t.TaskActions)
+            .ToListAsync();
+
+        return taskList;
+    }
 }

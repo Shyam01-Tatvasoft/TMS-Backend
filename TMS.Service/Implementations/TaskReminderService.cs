@@ -30,13 +30,31 @@ public class TaskReminderService : ITaskReminderService
             var userId = task.FkUser?.Id.ToString();
             if (userId != null)
             {
-                string message = $"Reminder: Your task (ID: {task.Id}) is due tomorrow!";
+                string message = $"Reminder: Your task is due tomorrow!";
                 await _notificationService.AddNotification(task.FkUser.Id, task.Id, (int)Repository.Enums.Notification.NotificationEnum.Reminder);
 
                 await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, message);
                 string emailBodyAdmin = await GetTaskEmailBody(task.Id, "ReminderMail");
-                _emailService.SendMail(task?.FkUser?.Email!, "Task Reminder", emailBodyAdmin);
+                _emailService.SendMail(task?.FkUser?.Email!, "Task DueDate Reminder", emailBodyAdmin);
                 
+            }
+        }
+    }
+
+    public async System.Threading.Tasks.Task OverdueReminderService()
+    {
+        List<TaskAssign> overdueTasks = await _taskAssignRepository.GetOverdueTasksAsync();
+        foreach (var task in overdueTasks)
+        {
+            var userId = task.FkUser?.Id.ToString();
+            if (userId != null)
+            {
+                string message = $"Reminder: Your task is overdue!";
+                await _notificationService.AddNotification(task.FkUser.Id, task.Id, (int)Repository.Enums.Notification.NotificationEnum.Overdue);
+
+                await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, message);
+                string emailBodyAdmin = await GetTaskEmailBody(task.Id, "OverdueMail");
+                _emailService.SendMail(task?.FkUser?.Email!, "Task Overdue Reminder", emailBodyAdmin);
             }
         }
     }

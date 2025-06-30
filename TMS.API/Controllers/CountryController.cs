@@ -26,29 +26,24 @@ public class CountryController : ControllerBase
     }
 
      [HttpGet("countries")]
-    public async Task<ActionResult<APIResponse>> GetCountries()
+    public async Task<IActionResult> GetCountries()
     {
         // string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
-            _response.StatusCode = HttpStatusCode.OK;
-            _response.IsSuccess = true;
-            _response.Result = await _countryService.GetCountries();
+            List<CountryDto> result = await _countryService.GetCountries();
             // await _logService.LogAsync("Get all countries.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, string.Empty);
-            return Ok(_response);
+            return Ok(result);
         }
         catch (System.Exception ex)
         {
-            _response.IsSuccess = false;
-            _response.StatusCode = HttpStatusCode.InternalServerError;
-            _response.ErrorMessage = new List<string> { ex.Message };
             // await _logService.LogAsync("Get all countries.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, string.Empty);
-            return StatusCode((int)HttpStatusCode.InternalServerError, _response);
+            return StatusCode(500, "Error retrieving countries: " + ex.Message);
         }
     }
 
     [HttpGet("timezone/{id:int}")]
-    public async Task<ActionResult<APIResponse>> GetTimezone(int id)
+    public async Task<IActionResult> GetTimezone(int id)
     {
         // string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
@@ -56,24 +51,16 @@ public class CountryController : ControllerBase
             List<CountryTimezoneDto> timezones = await _countryService.GetTimezonesByCountryId(id);
             if (timezones == null)
             {
-                _response.ErrorMessage = new List<string> { "No timezone found" };
-                _response.StatusCode = HttpStatusCode.NoContent;
-                _response.IsSuccess = false;
-                return BadRequest(_response);
+                return BadRequest("Invalid country ID or no timezones found for this country.");
             }
-            _response.StatusCode = HttpStatusCode.OK;
-            _response.IsSuccess = true;
-            _response.Result = timezones;
+           
             // await _logService.LogAsync("Get timezones.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, id.ToString());
-            return Ok(_response);
+            return Ok(timezones);
         }
         catch (System.Exception ex)
         {
-            _response.IsSuccess = false;
-            _response.StatusCode = HttpStatusCode.InternalServerError;
-            _response.ErrorMessage = new List<string> { ex.Message };
             // await _logService.LogAsync("Get timezones.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, id.ToString());
-            return StatusCode((int)HttpStatusCode.InternalServerError, _response);
+            return StatusCode(500, "Error retrieving timezones: " + ex.Message);
         }
     }
 
@@ -81,7 +68,7 @@ public class CountryController : ControllerBase
     [HttpPost("import")]
     public async Task<IActionResult> ImportCountries()
     {
-        var result = await _countryService.ImportCountriesAsync();
+        string result = await _countryService.ImportCountriesAsync();
         return Ok(new { message = result });
     }
 }

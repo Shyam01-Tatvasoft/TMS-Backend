@@ -3,9 +3,6 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging.Abstractions;
-using TMS.API.Hubs;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
@@ -20,14 +17,12 @@ public class TaskController : ControllerBase
     private readonly ITaskService _taskService;
     private readonly APIResponse _response;
     private readonly IJWTService _jwtService;
-    private readonly IHubContext<NotificationHub> _hubContext;
     private readonly ILogService _logService;
 
-    public TaskController(ITaskService taskService, IJWTService jwtService, IHubContext<NotificationHub> hubContext, ILogService logService)
+    public TaskController(ITaskService taskService, IJWTService jwtService, ILogService logService)
     {
         _taskService = taskService;
         _jwtService = jwtService;
-        _hubContext = hubContext;
         _logService = logService;
         _response = new APIResponse();
     }
@@ -35,7 +30,7 @@ public class TaskController : ControllerBase
     [HttpPost("get-tasks")]
     public async Task<IActionResult> GetAllTaskAssign()
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         var (email, role, userId) = _jwtService.ValidateToken(authToken);
         if (string.IsNullOrEmpty(authToken))
         {
@@ -45,15 +40,15 @@ public class TaskController : ControllerBase
         {
             if (email == null || role == null || userId == null)
                 return Unauthorized();
-            var draw = Request.Form["draw"].FirstOrDefault();
-            var start = Request.Form["start"].FirstOrDefault();
-            var length = Request.Form["length"].FirstOrDefault();
-            var searchValue = Request.Form["search[value]"].FirstOrDefault();
+            string? draw = Request.Form["draw"].FirstOrDefault();
+            string? start = Request.Form["start"].FirstOrDefault();
+            string? length = Request.Form["length"].FirstOrDefault();
+            string? searchValue = Request.Form["search[value]"].FirstOrDefault();
 
             int pageSize = length != null ? Convert.ToInt32(length) : 0;
             int skip = start != null ? Convert.ToInt32(start) : 0;
-            var sorting = Request.Form["order[0][column]"].FirstOrDefault();
-            var sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
+            string? sorting = Request.Form["order[0][column]"].FirstOrDefault();
+            string? sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
 
             var (taskList, totalCount) = await _taskService.GetAllTaskAssignAsync(int.Parse(userId), role, skip, pageSize, searchValue, sorting, sortDirection);
 
@@ -80,7 +75,7 @@ public class TaskController : ControllerBase
         string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
-            var taskAssign = await _taskService.GetTaskAssignAsync(id);
+            UpdateTaskDto? taskAssign = await _taskService.GetTaskAssignAsync(id);
             if (taskAssign == null)
             {
                 return NotFound();
@@ -98,7 +93,7 @@ public class TaskController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> AddTaskAssign([FromBody] AddTaskDto taskDto)
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         if (string.IsNullOrEmpty(authToken))
         {
             return Unauthorized();
@@ -115,7 +110,6 @@ public class TaskController : ControllerBase
             }
             string? userId = taskDto.FkUserId.ToString();
             string message = "New Task Assigned!";
-            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", userId, message);
             await _logService.LogAsync("Add task.", int.Parse(Id!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(taskDto));
             return Created($"/api/tasks/", result.id);
         }
@@ -129,7 +123,7 @@ public class TaskController : ControllerBase
     [HttpPut]
     public async Task<IActionResult> UpdateTaskAssign([FromBody] EditTaskDto taskDto)
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         if (string.IsNullOrEmpty(authToken))
         {
             return Unauthorized();
@@ -140,13 +134,13 @@ public class TaskController : ControllerBase
             if (email == null || role == null || userId == null)
                 return Unauthorized();
 
-            var result = await _taskService.UpdateTaskAssignAsync(taskDto, role);
-            if (!result.success)
+            var (success, message) = await _taskService.UpdateTaskAssignAsync(taskDto, role);
+            if (!success)
             {
-                return BadRequest(result.message);
+                return BadRequest(message);
             }
             await _logService.LogAsync("Update task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(taskDto));
-            return Ok(result.message);
+            return Ok(message);
         }
         catch (Exception ex)
         {
@@ -161,7 +155,7 @@ public class TaskController : ControllerBase
         string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
-            var tasks = await _taskService.GetAllTasksAsync();
+            List<TaskDto> tasks = await _taskService.GetAllTasksAsync();
             await _logService.LogAsync("Get task types(master table).", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, string.Empty);
             return Ok(tasks);
         }
@@ -178,7 +172,7 @@ public class TaskController : ControllerBase
         string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
-            var subTasks = await _taskService.GetSubTasksByTaskIdAsync(id);
+            List<SubTaskDto> subTasks = await _taskService.GetSubTasksByTaskIdAsync(id);
             if (subTasks == null || !subTasks.Any())
             {
                 return NotFound();
@@ -202,7 +196,7 @@ public class TaskController : ControllerBase
     [ProducesResponseType(500)]
     public async Task<IActionResult> ApproveTask(int id)
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         var (email, role, userId) = _jwtService.ValidateToken(authToken);
         try
         {
@@ -224,7 +218,6 @@ public class TaskController : ControllerBase
             }
             string? taskUserId = result.FkUserId.ToString();
             string message = "Your Task is Approved !";
-            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId, message);
             await _logService.LogAsync("Approve task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, string.Empty);
             return Ok("Task approved successfully.");
         }
@@ -242,7 +235,7 @@ public class TaskController : ControllerBase
     [ProducesResponseType(500)]
     public async Task<IActionResult> ReassignTask([FromForm] ReassignTaskDto dto)
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         var (email, role, userId) = _jwtService.ValidateToken(authToken);
         try
         {
@@ -264,7 +257,6 @@ public class TaskController : ControllerBase
             }
             string? taskUserId = result.FkUserId.ToString();
             string message = "Your Task is Reassigned !";
-            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", taskUserId, message);
             await _logService.LogAsync("Reassign tasks.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, string.Empty);
             return Ok("Task reassigned successfully.");
         }
@@ -280,7 +272,7 @@ public class TaskController : ControllerBase
     [ProducesResponseType(400)]
     public async Task<IActionResult> GetTaskForSchedular(DateTime start, DateTime end)
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         if (string.IsNullOrEmpty(authToken))
         {
             return Unauthorized();
@@ -291,7 +283,7 @@ public class TaskController : ControllerBase
             return Unauthorized();
         try
         {
-            var tasks = await _taskService.GetTasksForSchedular(start, end, role, id);
+            List<TaskAssignDto> tasks = await _taskService.GetTasksForSchedular(start, end, role, id);
             if (tasks == null || !tasks.Any())
             {
                 return NotFound("No tasks found for the specified date range.");

@@ -4,7 +4,6 @@ using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using TMS.API.Hubs;
 using TMS.API.Middleware;
 using TMS.Repository.Data;
 using TMS.Repository.Implementations;
@@ -161,7 +160,6 @@ app.UseAuthorization();
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
-    endpoints.MapHub<NotificationHub>("/notificationHub");
     endpoints.MapHub<ReminderHub>("/reminderHub");
 });
 
@@ -169,11 +167,17 @@ using (var scope = app.Services.CreateScope())
 {
     var jobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
     var reminderService = scope.ServiceProvider.GetRequiredService<ITaskReminderService>();
-
+    
     jobManager.AddOrUpdate(
         "daily-task-reminder",
         () => reminderService.DueDateReminderService(),
-        "56 17 * * *",
+        "30 9 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
+    
+    jobManager.AddOrUpdate(
+        "daily-overdue-reminder",
+        () => reminderService.OverdueReminderService(),
+        "30 9 * * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
 }
 

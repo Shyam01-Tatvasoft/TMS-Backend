@@ -5,8 +5,6 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR;
-using TMS.API.Hubs;
 using TMS.Repository.Dtos;
 using TMS.Service.Interfaces;
 
@@ -19,15 +17,13 @@ public class TaskActionController : ControllerBase
 {
     private readonly ITaskActionService _taskActionService;
     private readonly IJWTService _jwtService;
-    private readonly IHubContext<NotificationHub> _hubContext;
     private readonly IUserService _userService;
     private readonly ILogService _logService;
 
-    public TaskActionController(ITaskActionService taskActionService, IJWTService jwtService, IHubContext<NotificationHub> hubContext, IUserService userService, ILogService logService)
+    public TaskActionController(ITaskActionService taskActionService, IJWTService jwtService, IUserService userService, ILogService logService)
     {
         _jwtService = jwtService;
         _taskActionService = taskActionService;
-        _hubContext = hubContext;
         _userService = userService;
         _logService = logService;
     }
@@ -46,12 +42,15 @@ public class TaskActionController : ControllerBase
                 return BadRequest("Invalid email task data.");
             }
 
-            var taskAction = await _taskActionService.AddTaskActionAsync(dto);
+            int? taskAction = await _taskActionService.AddEmailTaskAsync(dto);
             if (taskAction == null)
             {
                 return StatusCode(500, "Failed to add task action.");
             }
-            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
+            else if (taskAction == -1)
+            {
+                return BadRequest("Task is overdue and cannot be submitted. Please contact your admin.");
+            }
             await _logService.LogAsync("Perform email task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             return Ok(taskAction);
         }
@@ -81,7 +80,10 @@ public class TaskActionController : ControllerBase
             {
                 return StatusCode(500, "Failed to add task action.");
             }
-            // await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
+            else if (taskAction == -1)
+            {
+                return BadRequest("Task is overdue and cannot be submitted. Please contact your admin.");
+            }
             await _logService.LogAsync("Perform upload file task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             return Ok(taskAction);
         }
@@ -98,7 +100,7 @@ public class TaskActionController : ControllerBase
     [ProducesResponseType(500)]
     public async Task<IActionResult> GetTaskActionById(int id)
     {
-        var authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         if (string.IsNullOrEmpty(authToken))
         {
             return Unauthorized();
@@ -137,15 +139,15 @@ public class TaskActionController : ControllerBase
         string? id = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
-            var user = await _userService.GetUserById(userId);
+            UserDto? user = await _userService.GetUserById(userId);
             if (user == null)
                 throw new Exception("User not found");
 
             string combinedUserInfo =
-                user?.FirstName.Substring(0, 2) +
-                user?.LastName.Substring(user.LastName.Length - 2) +
-                user?.Phone?.Substring(0, 1) +
-                user?.Email.Substring(0, 3);
+                user?.FirstName[..2] +
+                user?.LastName[(user.LastName.Length - 2)..] +
+                user?.Phone?[..1] +
+                user?.Email[..3];
             byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
             byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
 
@@ -186,19 +188,19 @@ public class TaskActionController : ControllerBase
         string? authUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         try
         {
-            var submittedData = await _taskActionService.GetTaskFileData(id);
+            List<TaskFileData>? submittedData = await _taskActionService.GetTaskFileData(id);
             if (submittedData == null || !submittedData.Any())
                 return NotFound("No file found");
 
-            var user = await _userService.GetUserById(int.Parse(userId));
+            UserDto? user = await _userService.GetUserById(int.Parse(userId));
             if (user == null)
                 return BadRequest("Invalid user");
 
             string combinedUserInfo =
-                user?.FirstName.Substring(0, 2) +
-                user?.LastName.Substring(user.LastName.Length - 2) +
-                user?.Phone?.Substring(0, 1) +
-                user?.Email.Substring(0, 3);
+                user?.FirstName[..2] +
+                user?.LastName[(user.LastName.Length - 2)..] +
+                user?.Phone?[..1] +
+                user?.Email[..3];
             byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
             byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));
 
@@ -230,7 +232,7 @@ public class TaskActionController : ControllerBase
 
             var zipBytes = await System.IO.File.ReadAllBytesAsync(zipPath);
             System.IO.File.Delete(zipPath);
-            
+
             await _logService.LogAsync("Download zip file.", int.Parse(authUserId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, id.ToString());
             return File(zipBytes, "application/zip", $"TaskAction_{id}_Files.zip");
         }

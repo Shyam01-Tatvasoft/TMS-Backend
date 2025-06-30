@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Transactions;
 using Microsoft.AspNetCore.SignalR;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
@@ -46,138 +47,167 @@ public class TaskActionService : ITaskActionService
             SubmittedAt = taskAction.SubmittedAt,
             SubmittedData = JsonSerializer.Deserialize<JsonElement>(taskAction.SubmittedData!),
             UserName = taskAction.FkUser != null ? taskAction.FkUser.FirstName + " " + taskAction.FkUser.LastName : string.Empty,
-            TaskName = taskAction.FkTask.FkTask.Name ?? string.Empty,
+            TaskName = taskAction.FkTask?.FkTask?.Name ?? string.Empty,
             SubTaskName = taskAction?.FkTask?.FkSubtask?.Name ?? string.Empty,
-            Status = taskAction?.FkUser != null ? ((Status.StatusEnum)taskAction?.FkTask?.Status).ToDescription() : string.Empty
+            Status = taskAction?.FkUser != null ? ((Status.StatusEnum)taskAction?.FkTask?.Status!).ToDescription() : string.Empty
         };
 
         return taskActionDto;
     }
 
-    public async Task<int> AddTaskActionAsync(EmailTaskDto emailTask)
+    public async Task<int> AddEmailTaskAsync(EmailTaskDto emailTask)
     {
-        var emailInfo = new
+        using TransactionScope transaction = new(TransactionScopeAsyncFlowOption.Enabled);
+        try
         {
-            emailTask.Email,
-            emailTask.Subject,
-            DateTime.Now
-        };
+            TaskAssign? taskAssigned = await _taskAssignRepository.GetTaskAssignAsync(emailTask.FkTaskId);
+            if(taskAssigned != null && taskAssigned.DueDate < DateTime.Now)
+            {
+                return -1; // Task is overdue, cannot perform action
+            }
+            var emailInfo = new
+            {
+                emailTask.Email,
+                emailTask.Subject,
+                DateTime.Now
+            };
 
-        var taskAction = new TaskAction
-        {
-            FkTaskId = emailTask.FkTaskId,
-            FkUserId = emailTask.FkUserId,
-            SubmittedAt = DateTime.Now,
-            SubmittedData = JsonSerializer.Serialize(emailInfo)
-        };
+            var taskAction = new TaskAction
+            {
+                FkTaskId = emailTask.FkTaskId,
+                FkUserId = emailTask.FkUserId,
+                SubmittedAt = DateTime.Now,
+                SubmittedData = JsonSerializer.Serialize(emailInfo)
+            };
 
-        // perform email send task
-        string emailBody = await GetTaskEmailBody("WelcomeMailTemplate");
-        _emailService.SendMail(emailTask.Email, emailTask.Subject, emailBody);
-        if (emailTask.TaskActionId != null && emailTask.TaskActionId != 0)
-        {
-            // Perform update when Task is reassigned
-            taskAction.Id = (int)emailTask.TaskActionId!;
-            await _taskActionRepository.UpdateTaskActionAsync(taskAction);
+            // perform email send task
+            string emailBody = await GetTaskEmailBody("WelcomeMailTemplate");
+            _emailService.SendMail(emailTask.Email, emailTask.Subject, emailBody);
+            if (emailTask.TaskActionId != null && emailTask.TaskActionId != 0)
+            {
+                // Perform update when Task is reassigned
+                taskAction.Id = (int)emailTask.TaskActionId!;
+                await _taskActionRepository.UpdateTaskActionAsync(taskAction);
+            }
+            else
+            {
+                await _taskActionRepository.AddTaskActionAsync(taskAction);
+            }
+
+
+            TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(emailTask.FkTaskId);
+            task.Status = (int?)Status.StatusEnum.Review;
+
+            await _taskAssignRepository.UpdateTaskAssignAsync(task);
+
+            // send mail to admin
+            string emailBodyAdmin = await GetTaskEmailBody(emailTask.FkTaskId, "TaskPerformedTemplate");
+            _emailService.SendMail("admin1@gmail.com", "Task Performed", emailBodyAdmin);
+
+            //send notification to admin
+            await _notificationService.AddNotification(1, emailTask.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
+            transaction.Complete();
+            return taskAction.Id;
         }
-        else
+        catch (System.Exception)
         {
-            await _taskActionRepository.AddTaskActionAsync(taskAction);
+            transaction.Dispose();
+            throw;
         }
-
-
-        TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(emailTask.FkTaskId);
-        task.Status = (int?)Status.StatusEnum.Review;
-
-        await _taskAssignRepository.UpdateTaskAssignAsync(task);
-
-        // send mail to admin
-        string emailBodyAdmin = await GetTaskEmailBody(emailTask.FkTaskId, "TaskPerformedTemplate");
-        _emailService.SendMail("admin@gmail.com", "Task Performed", emailBodyAdmin);
-
-        //send notification to admin
-        await _notificationService.AddNotification(1, emailTask.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
-        await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
-        return taskAction.Id;
     }
 
     public async Task<int> AddUploadTaskAsync(UploadFileTaskDto dto)
     {
-        var files = dto.Files;
-        var taskId = dto.FkTaskId;
-        var userId = dto.FkUserId;
-        UserDto? user = await _userService.GetUserById(userId);
-
-        var userFolder = Path.Combine(Directory.GetCurrentDirectory(), "Upload", userId.ToString());
-
-        if (!Directory.Exists(userFolder))
-            Directory.CreateDirectory(userFolder);
-
-        // Generate Key and IV based on user details
-        string combinedUserInfo =
-            user?.FirstName.Substring(0, 2) +
-            user?.LastName.Substring(user.LastName.Length - 2) +
-            user?.Phone?.Substring(0, 1) +
-            user?.Email.Substring(0, 3);
-
-        byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo)); // 32 bytes
-        byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));    // 16 bytes
-
-        var submittedDataList = new List<object>();
-
-        foreach (var file in files)
+        using TransactionScope transaction = new(TransactionScopeAsyncFlowOption.Enabled);
+        try
         {
-            var originalFileName = file.FileName;
-            var encryptedFileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
-            var encryptedPath = Path.Combine(userFolder, encryptedFileName);
-
-            using (var fs = new FileStream(encryptedPath, FileMode.Create))
-            using (var aes = Aes.Create())
+            TaskAssign? taskAssigned = await _taskAssignRepository.GetTaskAssignAsync(dto.FkTaskId);
+            if(taskAssigned != null && taskAssigned.DueDate < DateTime.Now)
             {
-                aes.Key = key;
-                aes.IV = iv;
+                return -1; // Task is overdue, cannot perform action
+            }
+            var files = dto.Files;
+            var taskId = dto.FkTaskId;
+            var userId = dto.FkUserId;
+            UserDto? user = await _userService.GetUserById(userId);
+            var userFolder = Path.Combine(Directory.GetCurrentDirectory(), "Upload", userId.ToString());
 
-                using var cryptoStream = new CryptoStream(fs, aes.CreateEncryptor(), CryptoStreamMode.Write);
-                await file.CopyToAsync(cryptoStream);
+            if (!Directory.Exists(userFolder))
+                Directory.CreateDirectory(userFolder);
+
+            // Generate Key and IV based on user details
+            string combinedUserInfo =
+                user?.FirstName[..2] +
+                user?.LastName[(user.LastName.Length - 2)..] +
+                user?.Phone?[..1] +
+                user?.Email[..3];
+
+            byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(combinedUserInfo)); // 32 bytes
+            byte[] iv = MD5.HashData(Encoding.UTF8.GetBytes(combinedUserInfo));    // 16 bytes
+
+            var submittedDataList = new List<object>();
+
+            foreach (var file in files)
+            {
+                var originalFileName = file.FileName;
+                var encryptedFileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
+                var encryptedPath = Path.Combine(userFolder, encryptedFileName);
+
+                using (var fs = new FileStream(encryptedPath, FileMode.Create))
+                using (var aes = Aes.Create())
+                {
+                    aes.Key = key;
+                    aes.IV = iv;
+
+                    using var cryptoStream = new CryptoStream(fs, aes.CreateEncryptor(), CryptoStreamMode.Write);
+                    await file.CopyToAsync(cryptoStream);
+                }
+
+                submittedDataList.Add(new
+                {
+                    OriginalFileName = originalFileName,
+                    StoredFileName = encryptedFileName,
+                    Size = file.Length,
+                    UploadedAt = DateTime.Now
+                });
             }
 
-            submittedDataList.Add(new
+            TaskAction taskAction = new()
             {
-                OriginalFileName = originalFileName,
-                StoredFileName = encryptedFileName,
-                Size = file.Length,
-                UploadedAt = DateTime.Now
-            });
+                FkTaskId = taskId,
+                FkUserId = userId,
+                SubmittedAt = DateTime.Now,
+                SubmittedData = JsonSerializer.Serialize(submittedDataList)
+            };
+
+            if (dto.TaskActionId != null && dto.TaskActionId != 0)
+            {
+                taskAction.Id = (int)dto.TaskActionId!;
+                await _taskActionRepository.UpdateTaskActionAsync(taskAction);
+            }
+            else
+            {
+                await _taskActionRepository.AddTaskActionAsync(taskAction);
+            }
+
+            TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(dto.FkTaskId);
+            task.Status = (int?)Status.StatusEnum.Review;
+            await _taskAssignRepository.UpdateTaskAssignAsync(task);
+
+            // Send notifications
+            string emailBodyAdmin = await GetTaskEmailBody(dto.FkTaskId, "TaskPerformedTemplate");
+            _emailService.SendMail("admin1@gmail.com", "Task Performed", emailBodyAdmin);
+            await _notificationService.AddNotification(1, dto.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
+            await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
+            transaction.Complete();
+            return taskAction.Id;
         }
-
-        var taskAction = new TaskAction
+        catch (System.Exception)
         {
-            FkTaskId = taskId,
-            FkUserId = userId,
-            SubmittedAt = DateTime.Now,
-            SubmittedData = JsonSerializer.Serialize(submittedDataList)
-        };
-
-        if (dto.TaskActionId != null && dto.TaskActionId != 0)
-        {
-            taskAction.Id = (int)dto.TaskActionId!;
-            await _taskActionRepository.UpdateTaskActionAsync(taskAction);
+            transaction.Dispose();
+            throw;
         }
-        else
-        {
-            await _taskActionRepository.AddTaskActionAsync(taskAction);
-        }
-
-        TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(dto.FkTaskId);
-        task.Status = (int?)Status.StatusEnum.Review;
-        await _taskAssignRepository.UpdateTaskAssignAsync(task);
-
-        // Send notifications
-        string emailBodyAdmin = await GetTaskEmailBody(dto.FkTaskId, "TaskPerformedTemplate");
-        _emailService.SendMail("admin@gmail.com", "Task Performed", emailBodyAdmin);
-        await _notificationService.AddNotification(1, dto.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
-        await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
-        return taskAction.Id;
     }
 
     public async Task<string> GetTaskEmailBody(string templateName = "WelcomeMailTemplate")
@@ -209,8 +239,8 @@ public class TaskActionService : ITaskActionService
         emailBody = emailBody.Replace("{{UserName}}", task?.FkUser.FirstName + " " + task.FkUser.LastName ?? "User");
         emailBody = emailBody.Replace("{{TaskType}}", task.FkTask?.Name ?? "-");
         emailBody = emailBody.Replace("{{SubTask}}", task.FkSubtask?.Name ?? "-");
-        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority.Value).ToString() ?? "-");
-        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status.Value).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority.Value!).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status.Value!).ToString() ?? "-");
         emailBody = emailBody.Replace("{{DueDate}}", task.DueDate.ToString("dd MMM yyyy"));
         emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
 
