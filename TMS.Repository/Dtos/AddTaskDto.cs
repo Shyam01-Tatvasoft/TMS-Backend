@@ -9,13 +9,13 @@ public class AddTaskDto
 
     [Required]
     public int? FkUserId { get; set; }
-    
+
     [Required]
     public int? FkTaskId { get; set; }
 
     [Required]
     public int? FkSubtaskId { get; set; }
-    
+
     [Required]
     public JsonElement? TaskData { get; set; }
 
@@ -27,4 +27,14 @@ public class AddTaskDto
 
     [Required]
     public int? Priority { get; set; }
+
+    public bool Recurrence { get; set; }
+
+    public int? RecurrencePattern { get; set; }
+
+    public int? RecurrenceOn { get; set; }
+
+    public int? EndAfter { get; set; }
+
+    public DateTime RecurrenceTo { get; set; }
 }

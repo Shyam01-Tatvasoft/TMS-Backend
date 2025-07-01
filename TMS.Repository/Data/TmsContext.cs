@@ -15,15 +15,37 @@ public partial class TmsContext : DbContext
     {
     }
 
+    public virtual DbSet<Counter> Counters { get; set; }
+
     public virtual DbSet<Country> Countries { get; set; }
 
     public virtual DbSet<CountryTimezone> CountryTimezones { get; set; }
+
+    public virtual DbSet<Hash> Hashes { get; set; }
+
+    public virtual DbSet<Job> Jobs { get; set; }
+
+    public virtual DbSet<Jobparameter> Jobparameters { get; set; }
+
+    public virtual DbSet<Jobqueue> Jobqueues { get; set; }
+
+    public virtual DbSet<List> Lists { get; set; }
+
+    public virtual DbSet<Lock> Locks { get; set; }
 
     public virtual DbSet<Log> Logs { get; set; }
 
     public virtual DbSet<Notification> Notifications { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }
+
+    public virtual DbSet<Schema> Schemas { get; set; }
+
+    public virtual DbSet<Server> Servers { get; set; }
+
+    public virtual DbSet<Set> Sets { get; set; }
+
+    public virtual DbSet<State> States { get; set; }
 
     public virtual DbSet<SubTask> SubTasks { get; set; }
 
@@ -41,6 +63,24 @@ public partial class TmsContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Counter>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("counter_pkey");
+
+            entity.ToTable("counter", "hangfire");
+
+            entity.HasIndex(e => e.Expireat, "ix_hangfire_counter_expireat");
+
+            entity.HasIndex(e => e.Key, "ix_hangfire_counter_key");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Expireat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("expireat");
+            entity.Property(e => e.Key).HasColumnName("key");
+            entity.Property(e => e.Value).HasColumnName("value");
+        });
+
         modelBuilder.Entity<Country>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("country_pkey");
@@ -85,6 +125,116 @@ public partial class TmsContext : DbContext
             entity.HasOne(d => d.FkCountry).WithMany(p => p.CountryTimezones)
                 .HasForeignKey(d => d.FkCountryId)
                 .HasConstraintName("timezone_country_id_fkey");
+        });
+
+        modelBuilder.Entity<Hash>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("hash_pkey");
+
+            entity.ToTable("hash", "hangfire");
+
+            entity.HasIndex(e => new { e.Key, e.Field }, "hash_key_field_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Expireat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("expireat");
+            entity.Property(e => e.Field).HasColumnName("field");
+            entity.Property(e => e.Key).HasColumnName("key");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
+            entity.Property(e => e.Value).HasColumnName("value");
+        });
+
+        modelBuilder.Entity<Job>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("job_pkey");
+
+            entity.ToTable("job", "hangfire");
+
+            entity.HasIndex(e => e.Statename, "ix_hangfire_job_statename");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Arguments).HasColumnName("arguments");
+            entity.Property(e => e.Createdat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("createdat");
+            entity.Property(e => e.Expireat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("expireat");
+            entity.Property(e => e.Invocationdata).HasColumnName("invocationdata");
+            entity.Property(e => e.Stateid).HasColumnName("stateid");
+            entity.Property(e => e.Statename).HasColumnName("statename");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
+        });
+
+        modelBuilder.Entity<Jobparameter>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("jobparameter_pkey");
+
+            entity.ToTable("jobparameter", "hangfire");
+
+            entity.HasIndex(e => new { e.Jobid, e.Name }, "ix_hangfire_jobparameter_jobidandname");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Jobid).HasColumnName("jobid");
+            entity.Property(e => e.Name).HasColumnName("name");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
+            entity.Property(e => e.Value).HasColumnName("value");
+
+            entity.HasOne(d => d.Job).WithMany(p => p.Jobparameters)
+                .HasForeignKey(d => d.Jobid)
+                .HasConstraintName("jobparameter_jobid_fkey");
+        });
+
+        modelBuilder.Entity<Jobqueue>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("jobqueue_pkey");
+
+            entity.ToTable("jobqueue", "hangfire");
+
+            entity.HasIndex(e => new { e.Jobid, e.Queue }, "ix_hangfire_jobqueue_jobidandqueue");
+
+            entity.HasIndex(e => new { e.Queue, e.Fetchedat }, "ix_hangfire_jobqueue_queueandfetchedat");
+
+            entity.HasIndex(e => new { e.Queue, e.Fetchedat, e.Jobid }, "jobqueue_queue_fetchat_jobid");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Fetchedat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("fetchedat");
+            entity.Property(e => e.Jobid).HasColumnName("jobid");
+            entity.Property(e => e.Queue).HasColumnName("queue");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
+        });
+
+        modelBuilder.Entity<List>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("list_pkey");
+
+            entity.ToTable("list", "hangfire");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Expireat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("expireat");
+            entity.Property(e => e.Key).HasColumnName("key");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
+            entity.Property(e => e.Value).HasColumnName("value");
+        });
+
+        modelBuilder.Entity<Lock>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("lock", "hangfire");
+
+            entity.HasIndex(e => e.Resource, "lock_resource_key").IsUnique();
+
+            entity.Property(e => e.Acquired)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("acquired");
+            entity.Property(e => e.Resource).HasColumnName("resource");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
         });
 
         modelBuilder.Entity<Log>(entity =>
@@ -141,6 +291,72 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.Name)
                 .HasMaxLength(100)
                 .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<Schema>(entity =>
+        {
+            entity.HasKey(e => e.Version).HasName("schema_pkey");
+
+            entity.ToTable("schema", "hangfire");
+
+            entity.Property(e => e.Version)
+                .ValueGeneratedNever()
+                .HasColumnName("version");
+        });
+
+        modelBuilder.Entity<Server>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("server_pkey");
+
+            entity.ToTable("server", "hangfire");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Data).HasColumnName("data");
+            entity.Property(e => e.Lastheartbeat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("lastheartbeat");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
+        });
+
+        modelBuilder.Entity<Set>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("set_pkey");
+
+            entity.ToTable("set", "hangfire");
+
+            entity.HasIndex(e => new { e.Key, e.Value }, "set_key_value_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Expireat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("expireat");
+            entity.Property(e => e.Key).HasColumnName("key");
+            entity.Property(e => e.Score).HasColumnName("score");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
+            entity.Property(e => e.Value).HasColumnName("value");
+        });
+
+        modelBuilder.Entity<State>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("state_pkey");
+
+            entity.ToTable("state", "hangfire");
+
+            entity.HasIndex(e => e.Jobid, "ix_hangfire_state_jobid");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Createdat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("createdat");
+            entity.Property(e => e.Data).HasColumnName("data");
+            entity.Property(e => e.Jobid).HasColumnName("jobid");
+            entity.Property(e => e.Name).HasColumnName("name");
+            entity.Property(e => e.Reason).HasColumnName("reason");
+            entity.Property(e => e.Updatecount).HasColumnName("updatecount");
+
+            entity.HasOne(d => d.Job).WithMany(p => p.States)
+                .HasForeignKey(d => d.Jobid)
+                .HasConstraintName("state_jobid_fkey");
         });
 
         modelBuilder.Entity<SubTask>(entity =>
@@ -211,12 +427,21 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.DueDate)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("due_date");
+            entity.Property(e => e.EndAfter).HasColumnName("end_after");
             entity.Property(e => e.FkSubtaskId).HasColumnName("fk_subtask_id");
             entity.Property(e => e.FkTaskId).HasColumnName("fk_task_id");
             entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
+            entity.Property(e => e.IsRecurrence)
+                .HasDefaultValueSql("false")
+                .HasColumnName("is_recurrence");
             entity.Property(e => e.Priority)
                 .HasDefaultValueSql("1")
                 .HasColumnName("priority");
+            entity.Property(e => e.RecurrenceOn).HasColumnName("recurrence_on");
+            entity.Property(e => e.RecurrencePattern).HasColumnName("recurrence_pattern");
+            entity.Property(e => e.RecurrenceTo)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("recurrence_to");
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("1")
                 .HasColumnName("status");

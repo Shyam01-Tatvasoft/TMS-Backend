@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
 using System.Transactions;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.SignalR;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
@@ -113,24 +114,154 @@ public class TaskService : ITaskService
                 FkTaskId = task.FkTaskId,
                 FkSubtaskId = task.FkSubtaskId,
                 TaskData = JsonSerializer.Serialize(task.TaskData),
-                DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59),
+                DueDate = DateTime.SpecifyKind(task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59), DateTimeKind.Local),
                 Status = task.Status,
                 Priority = task.Priority,
                 CreatedAt = DateTime.Now,
             };
-            await _taskAssignRepository.AddTaskAssignAsync(newTask);
-            await _notificationService.AddNotification((int)task.FkUserId, newTask.Id, (int)Repository.Enums.Notification.NotificationEnum.Assigned);
-            string emailBody = await GetTaskEmailBody(newTask.Id);
-            _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, "New Task Assigned!");
-            transaction.Complete();
-            return (newTask.Id, "Task assigned successfully.");
+
+            if (task.Recurrence)
+            {
+                var (id, message) = await HandleRecurrenceTaskAsync(newTask, task);
+                transaction.Complete();
+                return (id, message);
+            }
+            else
+            {
+                newTask.RecurrenceTo = null;
+                await _taskAssignRepository.AddTaskAssignAsync(newTask);
+                await _notificationService.AddNotification((int)task.FkUserId, newTask.Id, (int)Repository.Enums.Notification.NotificationEnum.Assigned);
+                string emailBody = await GetTaskEmailBody(newTask.Id);
+                _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
+                await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, "New Task Assigned!");
+                transaction.Complete();
+                return (newTask.Id, "Task assigned successfully.");
+            }
         }
         catch (System.Exception)
         {
             transaction.Dispose();
             throw;
         }
+    }
+
+    private async Task<(int, string)> HandleRecurrenceTaskAsync(TaskAssign newTask, AddTaskDto task)
+    {
+        if (task.RecurrencePattern < 1 || task.RecurrencePattern > 3)
+        {
+            return (0, "Invalid recurrence pattern.");
+        }
+
+        if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Monthly && (task.RecurrenceOn < 1 || task.RecurrenceOn > 31))
+        {
+            return (0, "Invalid recurrence day.");
+        }
+        else if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Weekly && (task.RecurrenceOn < 1 || task.RecurrenceOn > 5))
+        {
+            return (0, "Invalid recurrence day of the week.");
+        }
+        else if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Daily && task.RecurrenceOn != 1)
+        {
+            return (0, "Invalid recurrence day.");
+        }
+
+        newTask.IsRecurrence = task.Recurrence;
+        newTask.RecurrencePattern = task.RecurrencePattern;
+        newTask.RecurrenceOn = task.RecurrenceOn;
+        newTask.EndAfter = task.EndAfter;
+        newTask.RecurrenceTo = DateTime.SpecifyKind(task.RecurrenceTo.Date, DateTimeKind.Local);
+
+        if (task.EndAfter.HasValue && (task.EndAfter.Value < 1 || task.EndAfter.Value > 100))
+        {
+            return (0, "End after must be greater than 0 and less than 100.");
+        }
+
+        if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Daily)
+        {
+            DateTime startDate = DateTime.SpecifyKind(task.RecurrenceTo.Date, DateTimeKind.Local);
+            for (int i = 0; i < task.EndAfter; i++)
+            {
+                //skip weekend days
+                if ((int)startDate.DayOfWeek == 6)
+                {
+                    startDate = startDate.AddDays(2);
+                }
+                newTask.CreatedAt = startDate;
+                if ((int)startDate.DayOfWeek == 5)
+                {
+                    newTask.DueDate = startDate.AddDays(2).AddHours(23).AddMinutes(59).AddSeconds(59);
+                }
+                else
+                {
+                    newTask.DueDate = startDate.AddDays(1).AddHours(23).AddMinutes(59).AddSeconds(59);
+                }
+                newTask.Id = 0;
+                await _taskAssignRepository.AddTaskAssignAsync(newTask);
+                startDate = startDate.AddDays(1);
+            }
+        }
+        else if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Weekly)
+        {
+            DateTime startDate = FindNextRecurrenceOn(task.RecurrenceTo.Date, task.RecurrenceOn);
+            for (int i = 0; i < task.EndAfter; i++)
+            {
+                newTask.CreatedAt = startDate;
+                DateTime nextDueDate = startDate.AddDays(7);
+                newTask.DueDate = nextDueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+                newTask.Id = 0;
+                await _taskAssignRepository.AddTaskAssignAsync(newTask);
+                startDate = nextDueDate;
+            }
+        }
+        else if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Monthly)
+        {
+            DateTime startDate = FindNextRecurrenceMonth(task.RecurrenceTo.Date, task.RecurrenceOn);
+            for (int i = 0; i < task.EndAfter; i++)
+            {
+                newTask.CreatedAt = startDate;
+                DateTime nextDueDate;
+                if (startDate.Day > DateTime.DaysInMonth(startDate.Year, startDate.Month + 1))
+                    nextDueDate = new DateTime(startDate.Year, startDate.Month + 1, DateTime.DaysInMonth(startDate.Year, startDate.Month + 1));
+                else
+                    nextDueDate = new DateTime(startDate.Year, startDate.Month + 1, startDate.Day);
+
+                newTask.DueDate = nextDueDate;
+                newTask.Id = 0;
+                await _taskAssignRepository.AddTaskAssignAsync(newTask);
+                startDate = nextDueDate;
+            }
+        }
+        return (newTask.Id, "Task assigned successfully with recurrence.");
+    }
+
+    private static DateTime FindNextRecurrenceOn(DateTime recurrenceTo, int? recurrenceOn)
+    {
+        DateTime nextRecurrence = DateTime.SpecifyKind(recurrenceTo.Date, DateTimeKind.Local);
+
+        while (true)
+        {
+            nextRecurrence = nextRecurrence.AddDays(1);
+            if ((int)nextRecurrence.DayOfWeek == recurrenceOn)
+            {
+                break;
+            }
+        }
+        return nextRecurrence;
+    }
+
+    private static DateTime FindNextRecurrenceMonth(DateTime recurrenceTo, int? recurrenceOn)
+    {
+        DateTime nextRecurrence = DateTime.SpecifyKind(recurrenceTo.Date, DateTimeKind.Local);
+        int day = recurrenceOn.Value;
+
+        if (nextRecurrence.Day >= day)
+        {
+            nextRecurrence = nextRecurrence.AddMonths(1);
+        }
+
+        nextRecurrence = new DateTime(nextRecurrence.Year, nextRecurrence.Month, day);
+
+        return nextRecurrence;
     }
 
     public async Task<(bool success, string message)> UpdateTaskAssignAsync(EditTaskDto task, string role)

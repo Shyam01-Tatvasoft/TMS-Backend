@@ -104,7 +104,7 @@ public class TaskController : ControllerBase
             if (email == null || role == null || Id == null)
                 return Unauthorized();
             var result = await _taskService.AddTaskAssignAsync(taskDto, role);
-            if (result.id == 0)
+            if (result.id == 0 && result.message != "Task assigned successfully with recurrence.")
             {
                 return BadRequest(result.message);
             }

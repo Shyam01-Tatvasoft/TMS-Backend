@@ -25,6 +25,16 @@ public partial class TaskAssign
 
     public int? FkSubtaskId { get; set; }
 
+    public bool? IsRecurrence { get; set; }
+
+    public int? RecurrencePattern { get; set; }
+
+    public int? RecurrenceOn { get; set; }
+
+    public int? EndAfter { get; set; }
+
+    public DateTime? RecurrenceTo { get; set; }
+
     public virtual SubTask? FkSubtask { get; set; }
 
     public virtual Task? FkTask { get; set; }
