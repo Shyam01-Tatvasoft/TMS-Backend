@@ -4,4 +4,5 @@ public interface ITaskReminderService
 {
     public Task DueDateReminderService();
     public Task OverdueReminderService();
+    public Task RecurrentTaskAssignmentService();
 }

@@ -297,4 +297,36 @@ public class TaskController : ControllerBase
             return StatusCode(500, _response);
         }
     }
+
+    [HttpPost("chart-data")]
+    [ProducesResponseType(typeof(List<TaskGraphDto>), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> GetTaskChartData([FromBody]TaskGraphFilterDto filter)
+    {
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+        if(role == "User")
+            return Forbid();
+
+        int id = int.Parse(userId!);
+        if (email == null || role == null || userId == null)
+            return Unauthorized();
+        try
+        {
+            List<TaskGraphDto> chartData = await _taskService.GetTaskChartData(filter);
+            await _logService.LogAsync("Get tasks analysis.", id, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, JsonSerializer.Serialize(filter));
+            return Ok(chartData);
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Get task analysis.", id, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(filter));
+            throw;
+        }
+    }
 }

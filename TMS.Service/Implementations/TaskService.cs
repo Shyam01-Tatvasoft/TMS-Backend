@@ -102,11 +102,6 @@ public class TaskService : ITaskService
                 return (0, "Invalid status.");
             }
 
-            bool isHoliday = await _holidayService.IsHolidayAsync(user?.FkCountry?.IsoCode!, task.DueDate);
-            if (isHoliday)
-            {
-                return (0, $"Please assign task on another day because it's a public holiday for {user?.FirstName + " " + user?.LastName}.");
-            }
             TaskAssign newTask = new()
             {
                 Description = task.Description,
@@ -120,14 +115,19 @@ public class TaskService : ITaskService
                 CreatedAt = DateTime.Now,
             };
 
-            if (task.Recurrence)
+            if (task.IsRecurrence)
             {
-                var (id, message) = await HandleRecurrenceTaskAsync(newTask, task);
+                var (id, message) = await HandleRecurrenceTaskAsync(newTask, task, user?.FkCountry?.IsoCode!);
                 transaction.Complete();
                 return (id, message);
             }
             else
             {
+                bool isHoliday = await _holidayService.IsHolidayAsync(user?.FkCountry?.IsoCode!, task.DueDate);
+                if (isHoliday)
+                {
+                    return (0, $"Please assign task on another day because it's a public holiday for {user?.FirstName + " " + user?.LastName}.");
+                }
                 newTask.RecurrenceTo = null;
                 await _taskAssignRepository.AddTaskAssignAsync(newTask);
                 await _notificationService.AddNotification((int)task.FkUserId, newTask.Id, (int)Repository.Enums.Notification.NotificationEnum.Assigned);
@@ -145,7 +145,7 @@ public class TaskService : ITaskService
         }
     }
 
-    private async Task<(int, string)> HandleRecurrenceTaskAsync(TaskAssign newTask, AddTaskDto task)
+    private async Task<(int, string)> HandleRecurrenceTaskAsync(TaskAssign newTask, AddTaskDto task, string isoCode)
     {
         if (task.RecurrencePattern < 1 || task.RecurrencePattern > 3)
         {
@@ -165,7 +165,7 @@ public class TaskService : ITaskService
             return (0, "Invalid recurrence day.");
         }
 
-        newTask.IsRecurrence = task.Recurrence;
+        newTask.IsRecurrence = task.IsRecurrence;
         newTask.RecurrencePattern = task.RecurrencePattern;
         newTask.RecurrenceOn = task.RecurrenceOn;
         newTask.EndAfter = task.EndAfter;
@@ -195,6 +195,9 @@ public class TaskService : ITaskService
                 {
                     newTask.DueDate = startDate.AddDays(1).AddHours(23).AddMinutes(59).AddSeconds(59);
                 }
+                bool isHoliday = await _holidayService.IsHolidayAsync(isoCode, newTask.DueDate);
+                if(isHoliday)
+                    continue;
                 newTask.Id = 0;
                 await _taskAssignRepository.AddTaskAssignAsync(newTask);
                 startDate = startDate.AddDays(1);
@@ -208,6 +211,9 @@ public class TaskService : ITaskService
                 newTask.CreatedAt = startDate;
                 DateTime nextDueDate = startDate.AddDays(7);
                 newTask.DueDate = nextDueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+                bool isHoliday = await _holidayService.IsHolidayAsync(isoCode, newTask.DueDate);
+                if(isHoliday)
+                    continue;
                 newTask.Id = 0;
                 await _taskAssignRepository.AddTaskAssignAsync(newTask);
                 startDate = nextDueDate;
@@ -226,6 +232,9 @@ public class TaskService : ITaskService
                     nextDueDate = new DateTime(startDate.Year, startDate.Month + 1, startDate.Day);
 
                 newTask.DueDate = nextDueDate;
+                bool isHoliday = await _holidayService.IsHolidayAsync(isoCode, newTask.DueDate);
+                if(isHoliday)
+                    continue;
                 newTask.Id = 0;
                 await _taskAssignRepository.AddTaskAssignAsync(newTask);
                 startDate = nextDueDate;
@@ -382,5 +391,10 @@ public class TaskService : ITaskService
     public async Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end, string role, int userId)
     {
         return await _taskAssignRepository.GetTasksForSchedular(start, end, role, userId);
+    }
+
+    public async Task<List<TaskGraphDto>> GetTaskChartData(TaskGraphFilterDto filter)
+    {
+        return await _taskAssignRepository.GetTaskChartDataAsync(filter);
     }
 }

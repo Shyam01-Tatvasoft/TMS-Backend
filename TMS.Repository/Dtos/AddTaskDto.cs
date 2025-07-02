@@ -28,7 +28,7 @@ public class AddTaskDto
     [Required]
     public int? Priority { get; set; }
 
-    public bool Recurrence { get; set; }
+    public bool IsRecurrence { get; set; }
 
     public int? RecurrencePattern { get; set; }
 

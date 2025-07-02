@@ -171,4 +171,41 @@ public class TaskAssignRepository : ITaskAssignRepository
 
         return taskList;
     }
+
+    public async Task<List<TaskAssign>> GetTodaysRecurrentTasksAsync()
+    {
+        var today = DateTime.Today;
+        List<TaskAssign> taskList = await _context.TaskAssigns.Where(t => t.IsRecurrence == true && t.CreatedAt.HasValue && t.CreatedAt.Value.Date == today.Date)
+            .Include(t => t.FkUser)
+            .ToListAsync();
+
+        return taskList;
+    }
+
+    public async Task<List<TaskGraphDto>> GetTaskChartDataAsync(TaskGraphFilterDto filter)
+    {
+        var filteredTasks = _context.TaskAssigns.AsQueryable();
+        int filterStatus = (int)(filter.Status == null ? (int)Status.StatusEnum.InProgress :  filter.Status);
+        DateTime? fromDate = DateTime.SpecifyKind(filter.FromDate.Value, DateTimeKind.Local);
+        DateTime? toDate = DateTime.SpecifyKind(filter.ToDate.Value, DateTimeKind.Local);
+
+
+        if (fromDate.HasValue && toDate.HasValue)
+        {
+            filteredTasks = filteredTasks.Where(t => t.CreatedAt >= fromDate && t.CreatedAt <= toDate);
+        }
+
+        if (filter.Status != 0)
+            filteredTasks = filteredTasks.Where(t => t.Status == filter.Status);
+
+        var taskChartData = await filteredTasks
+            .GroupBy(t => t.FkUserId)
+            .Select(g => new TaskGraphDto
+            {
+                UserName = g.FirstOrDefault().FkUser.Username,
+                TaskCount = g.Count(),
+                Status = g.FirstOrDefault().Status.HasValue  ? ((Status.StatusEnum)g.FirstOrDefault().Status!).ToDescription() : "null"
+            }).ToListAsync();
+        return taskChartData;
+    }
 }

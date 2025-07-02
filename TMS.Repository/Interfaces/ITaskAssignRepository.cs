@@ -12,4 +12,6 @@ public interface ITaskAssignRepository
     public Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end, string role, int userId);
     public Task<List<TaskAssign>> GetDueTasksAsync();
     public Task<List<TaskAssign>> GetOverdueTasksAsync();
+    public Task<List<TaskAssign>> GetTodaysRecurrentTasksAsync();
+    public Task<List<TaskGraphDto>> GetTaskChartDataAsync(TaskGraphFilterDto filter);
 }

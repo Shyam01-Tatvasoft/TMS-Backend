@@ -14,4 +14,5 @@ public interface ITaskService
     public Task<TaskAssign> ApproveTask(int id);
     public Task<TaskAssign> ReassignTask(ReassignTaskDto dto);
     public Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end, string role, int userId);
+    public Task<List<TaskGraphDto>> GetTaskChartData(TaskGraphFilterDto filter);
 }

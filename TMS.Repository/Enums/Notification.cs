@@ -18,5 +18,7 @@ public class Notification
         Reminder = 5,
         [Description("Overdue Reminder")]
         Overdue = 6,
+        [Description("Recurrent Task")]
+        Recurrence = 7
     }
 }

@@ -59,6 +59,24 @@ public class TaskReminderService : ITaskReminderService
         }
     }
 
+    public async System.Threading.Tasks.Task RecurrentTaskAssignmentService()
+    {
+        List<TaskAssign> overdueTasks = await _taskAssignRepository.GetTodaysRecurrentTasksAsync();
+        foreach (var task in overdueTasks)
+        {
+            var userId = task.FkUser?.Id.ToString();
+            if (userId != null)
+            {
+                string message = "Assigned recurrent task";
+                await _notificationService.AddNotification(task.FkUser.Id, task.Id, (int)Repository.Enums.Notification.NotificationEnum.Recurrence);
+
+                await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, message);
+                string emailBodyAdmin = await GetTaskEmailBody(task.Id, "TaskEmailTemplate");
+                _emailService.SendMail(task?.FkUser?.Email!, "New Task Assigned", emailBodyAdmin);
+            }
+        }
+    }
+
      public async Task<string> GetTaskEmailBody(int id, string templateName)
     {
         TaskAssign? task = await _taskAssignRepository.GetTaskAssignAsync(id);

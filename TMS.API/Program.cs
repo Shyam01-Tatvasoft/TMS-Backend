@@ -179,6 +179,12 @@ using (var scope = app.Services.CreateScope())
         () => reminderService.OverdueReminderService(),
         "30 9 * * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
+
+    jobManager.AddOrUpdate(
+        "recurrent-task-job",
+        () => reminderService.RecurrentTaskAssignmentService(),
+        "30 9 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
 }
 
 app.Run();
