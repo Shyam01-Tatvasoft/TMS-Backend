@@ -59,9 +59,9 @@ public class TaskService : ITaskService
         return subTaskDtos;
     }
 
-    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
+    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, string? taskType, int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
     {
-        return await _taskAssignRepository.GetAllTaskAssignAsync(id, role, skip, take, search, sorting, sortDirection);
+        return await _taskAssignRepository.GetAllTaskAssignAsync(id, role, skip, take, search, sorting, sortDirection, taskType);
     }
 
     public async Task<UpdateTaskDto?> GetTaskAssignAsync(int id)
@@ -83,6 +83,11 @@ public class TaskService : ITaskService
                 DueDate = taskAssign.DueDate,
                 Description = taskAssign.Description,
                 FkTaskActionId = taskAction != null ? taskAction.Id : 0,
+                IsRecurrence = taskAssign.IsRecurrence,
+                RecurrencePattern = taskAssign.RecurrencePattern != null ? ((Recurrence.RecurrenceEnum)taskAssign.RecurrencePattern).ToDescription() : null,
+                RecurrenceOn = taskAssign.RecurrenceOn,
+                RecurrenceTo = taskAssign.RecurrenceTo != null ? taskAssign.RecurrenceTo : null,
+                EndAfter = taskAssign.EndAfter
             };
         }
 
@@ -148,104 +153,118 @@ public class TaskService : ITaskService
     private async Task<(int, string)> HandleRecurrenceTaskAsync(TaskAssign newTask, AddTaskDto task, string isoCode)
     {
         if (task.RecurrencePattern < 1 || task.RecurrencePattern > 3)
-        {
             return (0, "Invalid recurrence pattern.");
-        }
 
         if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Monthly && (task.RecurrenceOn < 1 || task.RecurrenceOn > 31))
-        {
             return (0, "Invalid recurrence day.");
-        }
-        else if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Weekly && (task.RecurrenceOn < 1 || task.RecurrenceOn > 5))
-        {
-            return (0, "Invalid recurrence day of the week.");
-        }
-        else if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Daily && task.RecurrenceOn != 1)
-        {
-            return (0, "Invalid recurrence day.");
-        }
 
-        newTask.IsRecurrence = task.IsRecurrence;
-        newTask.RecurrencePattern = task.RecurrencePattern;
-        newTask.RecurrenceOn = task.RecurrenceOn;
-        newTask.EndAfter = task.EndAfter;
-        newTask.RecurrenceTo = DateTime.SpecifyKind(task.RecurrenceTo.Date, DateTimeKind.Local);
+        if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Weekly && (task.RecurrenceOn < 1 || task.RecurrenceOn > 7))
+            return (0, "Invalid recurrence day of the week.");
+
+        if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Daily && task.RecurrenceOn != 1)
+            return (0, "Invalid recurrence day.");
 
         if (task.EndAfter.HasValue && (task.EndAfter.Value < 1 || task.EndAfter.Value > 100))
-        {
             return (0, "End after must be greater than 0 and less than 100.");
+
+        //Generate due dates and start dates
+        var (startDates, dueDates) = GenerateDueDates(task);
+
+        // Fetch all holidays in a single time
+        var holidays = await _holidayService.GetHolidaysAsync(isoCode, dueDates.Min(), dueDates.Max());
+
+        if (holidays.Count > 0)
+        {
+            foreach (var date in dueDates)
+            {
+                if (holidays.Contains(date.Date))
+                    return (0, $"Holiday found on {date.Date.ToShortDateString()}. Recurrence halted.");
+            }
         }
 
-        if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Daily)
+        //Generate uniq guid id for recurrence tasks
+        string guid = Guid.NewGuid().ToString("N");
+        for (int i = 0; i < dueDates.Count; i++)
         {
-            DateTime startDate = DateTime.SpecifyKind(task.RecurrenceTo.Date, DateTimeKind.Local);
-            for (int i = 0; i < task.EndAfter; i++)
-            {
-                //skip weekend days
-                if ((int)startDate.DayOfWeek == 6)
-                {
-                    startDate = startDate.AddDays(2);
-                }
-                newTask.CreatedAt = startDate;
-                if ((int)startDate.DayOfWeek == 5)
-                {
-                    newTask.DueDate = startDate.AddDays(2).AddHours(23).AddMinutes(59).AddSeconds(59);
-                }
-                else
-                {
-                    newTask.DueDate = startDate.AddDays(1).AddHours(23).AddMinutes(59).AddSeconds(59);
-                }
-                bool isHoliday = await _holidayService.IsHolidayAsync(isoCode, newTask.DueDate);
-                if(isHoliday)
-                    continue;
-                newTask.Id = 0;
-                await _taskAssignRepository.AddTaskAssignAsync(newTask);
-                startDate = startDate.AddDays(1);
-            }
+            newTask.Id = 0;
+            newTask.IsRecurrence = task.IsRecurrence;
+            newTask.RecurrencePattern = task.RecurrencePattern;
+            newTask.RecurrenceOn = task.RecurrenceOn;
+            newTask.EndAfter = task.EndAfter;
+            newTask.RecurrenceTo = DateTime.SpecifyKind(task.RecurrenceTo.Date, DateTimeKind.Local);
+            newTask.CreatedAt = startDates[i].Date;
+            newTask.DueDate = dueDates[i].Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+            newTask.RecurrenceId = guid;
+            await _taskAssignRepository.AddTaskAssignAsync(newTask);
         }
-        else if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Weekly)
-        {
-            DateTime startDate = FindNextRecurrenceOn(task.RecurrenceTo.Date, task.RecurrenceOn);
-            for (int i = 0; i < task.EndAfter; i++)
-            {
-                newTask.CreatedAt = startDate;
-                DateTime nextDueDate = startDate.AddDays(7);
-                newTask.DueDate = nextDueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
-                bool isHoliday = await _holidayService.IsHolidayAsync(isoCode, newTask.DueDate);
-                if(isHoliday)
-                    continue;
-                newTask.Id = 0;
-                await _taskAssignRepository.AddTaskAssignAsync(newTask);
-                startDate = nextDueDate;
-            }
-        }
-        else if (task.RecurrencePattern == (int)Recurrence.RecurrenceEnum.Monthly)
-        {
-            DateTime startDate = FindNextRecurrenceMonth(task.RecurrenceTo.Date, task.RecurrenceOn);
-            for (int i = 0; i < task.EndAfter; i++)
-            {
-                newTask.CreatedAt = startDate;
-                DateTime nextDueDate;
-                if (startDate.Day > DateTime.DaysInMonth(startDate.Year, startDate.Month + 1))
-                    nextDueDate = new DateTime(startDate.Year, startDate.Month + 1, DateTime.DaysInMonth(startDate.Year, startDate.Month + 1));
-                else
-                    nextDueDate = new DateTime(startDate.Year, startDate.Month + 1, startDate.Day);
 
-                newTask.DueDate = nextDueDate;
-                bool isHoliday = await _holidayService.IsHolidayAsync(isoCode, newTask.DueDate);
-                if(isHoliday)
-                    continue;
-                newTask.Id = 0;
-                await _taskAssignRepository.AddTaskAssignAsync(newTask);
-                startDate = nextDueDate;
-            }
-        }
         return (newTask.Id, "Task assigned successfully with recurrence.");
     }
 
-    private static DateTime FindNextRecurrenceOn(DateTime recurrenceTo, int? recurrenceOn)
+
+    private static (List<DateTime>, List<DateTime>) GenerateDueDates(AddTaskDto task)
     {
-        DateTime nextRecurrence = DateTime.SpecifyKind(recurrenceTo.Date, DateTimeKind.Local);
+        List<DateTime> startDates = new();
+        List<DateTime> dueDates = new();
+        DateTime startDate = DateTime.SpecifyKind(task.RecurrenceTo.Date, DateTimeKind.Local);
+        int count = task.EndAfter ?? 1;
+
+        switch ((Recurrence.RecurrenceEnum)(task.RecurrencePattern ?? 1))
+        {
+            case Recurrence.RecurrenceEnum.Daily:
+                for (int i = 0; i < count;)
+                {
+                    if (!IsWeekend(startDate))
+                    {
+                        startDates.Add(startDate);
+                        if (!IsWeekend(startDate.AddDays(1)))
+                            dueDates.Add(startDate.AddDays(1));
+                        else
+                            dueDates.Add(startDate.AddDays(3));
+
+                        i++;
+                    }
+                    startDate = startDate.AddDays(1);
+                }
+                break;
+
+            case Recurrence.RecurrenceEnum.Weekly:
+                startDate = FindNextRecurrenceInWeek(startDate, task.RecurrenceOn);
+                for (int i = 0; i < count; i++)
+                {
+                    startDates.Add(startDate);
+                    startDate = startDate.AddDays(7);
+                    dueDates.Add(startDate);
+                }
+                break;
+
+            case Recurrence.RecurrenceEnum.Monthly:
+                if (startDate.Day >= task.RecurrenceOn)
+                {
+                    startDate = startDate.AddMonths(1);
+                }
+                startDate = new DateTime(startDate.Year, startDate.Month, (int)task.RecurrenceOn!);
+
+                for (int i = 0; i < count; i++)
+                {
+                    startDates.Add(startDate);
+                    startDate = FindNextRecurrenceMonth(startDate, task.RecurrenceOn);
+                    dueDates.Add(startDate);
+                }
+                break;
+        }
+
+        return (startDates, dueDates);
+    }
+
+    private static bool IsWeekend(DateTime Date)
+    {
+        return Date.DayOfWeek == DayOfWeek.Saturday || Date.DayOfWeek == DayOfWeek.Sunday;
+    }
+
+    private static DateTime FindNextRecurrenceInWeek(DateTime recurrenceTo, int? recurrenceOn)
+    {
+        DateTime nextRecurrence = recurrenceTo;
 
         while (true)
         {
@@ -260,16 +279,16 @@ public class TaskService : ITaskService
 
     private static DateTime FindNextRecurrenceMonth(DateTime recurrenceTo, int? recurrenceOn)
     {
-        DateTime nextRecurrence = DateTime.SpecifyKind(recurrenceTo.Date, DateTimeKind.Local);
-        int day = recurrenceOn.Value;
+        DateTime nextRecurrence = recurrenceTo.AddMonths(1);
+        int? day = recurrenceOn;
 
-        if (nextRecurrence.Day >= day)
+        int daysInMonth = DateTime.DaysInMonth(nextRecurrence.Year, nextRecurrence.Month);
+        if (day > daysInMonth)
         {
-            nextRecurrence = nextRecurrence.AddMonths(1);
+            day = daysInMonth;
         }
 
-        nextRecurrence = new DateTime(nextRecurrence.Year, nextRecurrence.Month, day);
-
+        nextRecurrence = new DateTime(nextRecurrence.Year, nextRecurrence.Month, (int)day!);
         return nextRecurrence;
     }
 
@@ -291,15 +310,73 @@ public class TaskService : ITaskService
             return (false, "Invalid status.");
         }
 
+
         existingTask.Description = task.Description;
         existingTask.TaskData = JsonSerializer.Serialize(task.TaskData);
         existingTask.DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
         existingTask.Status = task.Status;
         existingTask.Priority = task.Priority;
 
+        if (existingTask.IsRecurrence == true && existingTask.EndAfter != task.EndAfter)
+        {
+            return await HandleRecurrentTaskUpdate(existingTask, task);
+        }
+
         await _taskAssignRepository.UpdateTaskAssignAsync(existingTask);
 
         return (true, "Task updated successfully.");
+    }
+
+    public async Task<(bool, string)> HandleRecurrentTaskUpdate(TaskAssign existingTask, EditTaskDto updatedTask)
+    {
+        string message;
+        bool isSuccess;
+
+        if (existingTask.EndAfter < updatedTask.EndAfter)
+        {
+            int newTasks = (int)updatedTask.EndAfter - (int)existingTask.EndAfter;
+            existingTask.EndAfter = updatedTask.EndAfter;
+            for (int i = 0; i < newTasks; i++)
+            {
+                await _taskAssignRepository.AddTaskAssignAsync(existingTask);
+            }
+            message = "Task updated successfully.";
+            isSuccess = true;
+        }
+        else
+        {
+            // remove task which are not performed
+            List<TaskAssign> taskAssigns = await _taskAssignRepository.GetRecurrenceTaskAsync(existingTask.RecurrenceId!);
+            int count = 0;
+            foreach (var task in taskAssigns)
+            {
+                if (task.Status != (int)Status.StatusEnum.Pending && task.CreatedAt > DateTime.Now)
+                {
+                    count++;
+                }
+            }
+            if (count > updatedTask.EndAfter)
+            {
+                message = "You can not decrease end after less then" + count + "because they are under process.";
+                isSuccess = false;
+            }
+            else
+            {
+                foreach (var task in taskAssigns)
+                {
+                    if (task.Status == (int)Status.StatusEnum.Pending)
+                    {
+                        existingTask.Id = task.Id;
+                        existingTask.EndAfter = updatedTask.EndAfter;
+                        existingTask.IsDeleted = true;
+                        await _taskAssignRepository.UpdateTaskAssignAsync(existingTask);
+                    }
+                }
+                message = "Task Updated Successfully.";
+                isSuccess = true;
+            }
+        }
+        return (isSuccess, message);
     }
 
     public async Task<string> GetTaskEmailBody(int id, string templateName = "TaskEmailTemplate")

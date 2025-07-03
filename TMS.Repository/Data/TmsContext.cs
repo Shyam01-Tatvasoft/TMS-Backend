@@ -431,12 +431,18 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.FkSubtaskId).HasColumnName("fk_subtask_id");
             entity.Property(e => e.FkTaskId).HasColumnName("fk_task_id");
             entity.Property(e => e.FkUserId).HasColumnName("fk_user_id");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValueSql("false")
+                .HasColumnName("is_deleted");
             entity.Property(e => e.IsRecurrence)
                 .HasDefaultValueSql("false")
                 .HasColumnName("is_recurrence");
             entity.Property(e => e.Priority)
                 .HasDefaultValueSql("1")
                 .HasColumnName("priority");
+            entity.Property(e => e.RecurrenceId)
+                .HasMaxLength(100)
+                .HasColumnName("recurrence_id");
             entity.Property(e => e.RecurrenceOn).HasColumnName("recurrence_on");
             entity.Property(e => e.RecurrencePattern).HasColumnName("recurrence_pattern");
             entity.Property(e => e.RecurrenceTo)

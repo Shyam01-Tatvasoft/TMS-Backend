@@ -17,7 +17,7 @@ public class TaskAssignRepository : ITaskAssignRepository
         _context = context;
     }
 
-    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting, string? sortDirection)
+    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting, string? sortDirection, string? taskType)
     {
         var query = _context.TaskAssigns
             .Include(t => t.FkUser)
@@ -29,6 +29,14 @@ public class TaskAssignRepository : ITaskAssignRepository
         {
             query = query.Where(t => t.FkUser.Id == id);
         }
+
+        if(role.ToLower() == "admin" && taskType == "recurrence")
+        {
+            query = query.Where(t => t.IsRecurrence == true);
+        }else{
+            query = query.Where(t => t.IsRecurrence == false);
+        }
+
         if (!string.IsNullOrEmpty(sorting) && !string.IsNullOrEmpty(sortDirection))
         {
             if (sortDirection.ToLower() == "asc")
@@ -82,6 +90,8 @@ public class TaskAssignRepository : ITaskAssignRepository
                 CreatedAt = taskAssign.CreatedAt,
                 TaskName = taskAssign.FkTask.Name ?? string.Empty,
                 SubTaskName = taskAssign.FkSubtask.Name ?? string.Empty,
+                IsRecurrent = taskAssign.IsRecurrence,
+                RecurrenceId = taskAssign.RecurrenceId,
                 TaskActionId = ((Status.StatusEnum?)taskAssign.Status == Status.StatusEnum.Review ||
                 (Status.StatusEnum)taskAssign.Status == Status.StatusEnum.Completed)
                 ? _context.TaskActions
@@ -91,6 +101,13 @@ public class TaskAssignRepository : ITaskAssignRepository
             })
             .ToListAsync();
 
+        if(role.ToLower() == "admin" && taskType == "recurrence")
+        {
+            var groupedTasks = tasks.GroupBy(t => t.RecurrenceId)
+                .Select(g => g.First()).ToList();
+
+            tasks = groupedTasks;
+        }
 
 
         return (tasks, totalCount);
@@ -207,5 +224,10 @@ public class TaskAssignRepository : ITaskAssignRepository
                 Status = g.FirstOrDefault().Status.HasValue  ? ((Status.StatusEnum)g.FirstOrDefault().Status!).ToDescription() : "null"
             }).ToListAsync();
         return taskChartData;
+    }
+
+    public async Task<List<TaskAssign>> GetRecurrenceTaskAsync(string recurrenceId)
+    {
+        return await _context.TaskAssigns.Where(t => t.RecurrenceId == recurrenceId).ToListAsync();
     }
 }

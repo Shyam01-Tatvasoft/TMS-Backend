@@ -35,6 +35,10 @@ public partial class TaskAssign
 
     public DateTime? RecurrenceTo { get; set; }
 
+    public string? RecurrenceId { get; set; }
+
+    public bool? IsDeleted { get; set; }
+
     public virtual SubTask? FkSubtask { get; set; }
 
     public virtual Task? FkTask { get; set; }

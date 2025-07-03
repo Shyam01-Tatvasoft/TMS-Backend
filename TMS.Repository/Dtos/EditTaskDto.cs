@@ -21,4 +21,7 @@ public class EditTaskDto
 
     [Required]
     public int? Priority { get; set; }
+
+    [Required]
+    public int? EndAfter { get; set; }
 }

@@ -21,6 +21,10 @@ public class TaskAssignDto
     public DateTime? CreatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
 
+    public bool? IsRecurrent { get; set; }
+
+    public string? RecurrenceId { get; set; }
+
     public string TaskName { get; set; } = string.Empty;
 
     public string SubTaskName { get; set; } = string.Empty;
