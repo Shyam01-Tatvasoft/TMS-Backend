@@ -17,9 +17,9 @@ public class TaskAssignRepository : ITaskAssignRepository
         _context = context;
     }
 
-    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting, string? sortDirection, string? taskType)
+    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, int skip, int take, string? search, string? sorting, string? sortDirection, string? taskType, int? statusFilter, int? userFilter)
     {
-        var query = _context.TaskAssigns
+        var query = _context.TaskAssigns.Where(t => t.IsDeleted == false)
             .Include(t => t.FkUser)
             .Include(t => t.FkTask)
             .Include(t => t.FkSubtask)
@@ -30,11 +30,21 @@ public class TaskAssignRepository : ITaskAssignRepository
             query = query.Where(t => t.FkUser.Id == id);
         }
 
-        if(role.ToLower() == "admin" && taskType == "recurrence")
+        if (role.ToLower() == "admin")
         {
-            query = query.Where(t => t.IsRecurrence == true);
-        }else{
-            query = query.Where(t => t.IsRecurrence == false);
+            if (taskType == "recurrence")
+                query = query.Where(t => t.IsRecurrence == true);
+            else
+                query = query.Where(t => t.IsRecurrence == false);
+
+            if (userFilter != 0 && userFilter != null)
+            {
+                query = query.Where(t => t.FkUserId == userFilter);
+            }
+        }
+        if (statusFilter != 0 && statusFilter != null)
+        {
+            query = query.Where(t => t.Status == statusFilter);
         }
 
         if (!string.IsNullOrEmpty(sorting) && !string.IsNullOrEmpty(sortDirection))
@@ -75,7 +85,17 @@ public class TaskAssignRepository : ITaskAssignRepository
                 t.FkUser.LastName.ToLower().Contains(search));
         }
 
-        int totalCount = await query.CountAsync();
+        int totalCount;
+        // if(role.ToLower() == "admin" && taskType == "recurrence")
+        // {
+        //     query =  query.GroupBy(t => t.RecurrenceId)
+        //     .Select(g => g.FirstOrDefault());
+        //     totalCount = await query.CountAsync();
+        //     List<TaskAssign> taskList = await query.Skip(skip).Take(take).ToListAsync();
+        // }
+
+        totalCount = await query.CountAsync();
+
         List<TaskAssignDto> tasks = await query
             .Skip(skip)
             .Take(take)
@@ -101,7 +121,7 @@ public class TaskAssignRepository : ITaskAssignRepository
             })
             .ToListAsync();
 
-        if(role.ToLower() == "admin" && taskType == "recurrence")
+        if (role.ToLower() == "admin" && taskType == "recurrence")
         {
             var groupedTasks = tasks.GroupBy(t => t.RecurrenceId)
                 .Select(g => g.First()).ToList();
@@ -141,7 +161,7 @@ public class TaskAssignRepository : ITaskAssignRepository
 
         List<TaskAssignDto> taskList = await _context.TaskAssigns
             .Where(t => (role == "Admin") || (role == "User" && t.FkUserId == userId))
-            .Where(t => t.DueDate.Date > startUnspecified && t.DueDate.Date < endUnspecified)
+            .Where(t => t.DueDate.Date > startUnspecified && t.DueDate.Date < endUnspecified && t.IsDeleted == false)
             .Include(t => t.FkUser)
             .Include(t => t.FkTask)
             .Include(t => t.FkSubtask)
@@ -202,7 +222,7 @@ public class TaskAssignRepository : ITaskAssignRepository
     public async Task<List<TaskGraphDto>> GetTaskChartDataAsync(TaskGraphFilterDto filter)
     {
         var filteredTasks = _context.TaskAssigns.AsQueryable();
-        int filterStatus = (int)(filter.Status == null ? (int)Status.StatusEnum.InProgress :  filter.Status);
+        int filterStatus = (int)(filter.Status == null ? (int)Status.StatusEnum.InProgress : filter.Status);
         DateTime? fromDate = DateTime.SpecifyKind(filter.FromDate.Value, DateTimeKind.Local);
         DateTime? toDate = DateTime.SpecifyKind(filter.ToDate.Value, DateTimeKind.Local);
 
@@ -221,13 +241,13 @@ public class TaskAssignRepository : ITaskAssignRepository
             {
                 UserName = g.FirstOrDefault().FkUser.Username,
                 TaskCount = g.Count(),
-                Status = g.FirstOrDefault().Status.HasValue  ? ((Status.StatusEnum)g.FirstOrDefault().Status!).ToDescription() : "null"
+                Status = g.FirstOrDefault().Status.HasValue ? ((Status.StatusEnum)g.FirstOrDefault().Status!).ToDescription() : "null"
             }).ToListAsync();
         return taskChartData;
     }
 
     public async Task<List<TaskAssign>> GetRecurrenceTaskAsync(string recurrenceId)
     {
-        return await _context.TaskAssigns.Where(t => t.RecurrenceId == recurrenceId).ToListAsync();
+        return await _context.TaskAssigns.Where(t => t.RecurrenceId == recurrenceId && t.IsDeleted == false).OrderByDescending(t => t.DueDate).ToListAsync();
     }
 }

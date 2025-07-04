@@ -59,9 +59,9 @@ public class TaskService : ITaskService
         return subTaskDtos;
     }
 
-    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, string? taskType, int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
+    public async Task<(List<TaskAssignDto>, int count)> GetAllTaskAssignAsync(int id, string role, string? taskType, int? statusFilter, int? userFilter, int skip, int take, string? search, string? sorting = null, string? sortDirection = null)
     {
-        return await _taskAssignRepository.GetAllTaskAssignAsync(id, role, skip, take, search, sorting, sortDirection, taskType);
+        return await _taskAssignRepository.GetAllTaskAssignAsync(id, role, skip, take, search, sorting, sortDirection, taskType, statusFilter, userFilter);
     }
 
     public async Task<UpdateTaskDto?> GetTaskAssignAsync(int id)
@@ -168,7 +168,7 @@ public class TaskService : ITaskService
             return (0, "End after must be greater than 0 and less than 100.");
 
         //Generate due dates and start dates
-        var (startDates, dueDates) = GenerateDueDates(task);
+        var (startDates, dueDates) = GenerateDueDates(task,null);
 
         // Fetch all holidays in a single time
         var holidays = await _holidayService.GetHolidaysAsync(isoCode, dueDates.Min(), dueDates.Max());
@@ -202,10 +202,17 @@ public class TaskService : ITaskService
     }
 
 
-    private static (List<DateTime>, List<DateTime>) GenerateDueDates(AddTaskDto task)
+    private static (List<DateTime>, List<DateTime>) GenerateDueDates(AddTaskDto? addTask,TaskAssign? editTask)
     {
         List<DateTime> startDates = new();
         List<DateTime> dueDates = new();
+        dynamic task = addTask != null ? new AddTaskDto() : new TaskAssign();
+        if(addTask != null)
+        {
+            task = addTask;
+        }else{
+            task = editTask ?? throw new ArgumentNullException(nameof(editTask));
+        }
         DateTime startDate = DateTime.SpecifyKind(task.RecurrenceTo.Date, DateTimeKind.Local);
         int count = task.EndAfter ?? 1;
 
@@ -313,15 +320,15 @@ public class TaskService : ITaskService
 
         existingTask.Description = task.Description;
         existingTask.TaskData = JsonSerializer.Serialize(task.TaskData);
-        existingTask.DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
         existingTask.Status = task.Status;
         existingTask.Priority = task.Priority;
 
-        if (existingTask.IsRecurrence == true && existingTask.EndAfter != task.EndAfter)
+        if (existingTask.IsRecurrence == true && task.EndAfter != null && existingTask.EndAfter != task.EndAfter)
         {
             return await HandleRecurrentTaskUpdate(existingTask, task);
         }
 
+        existingTask.DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
         await _taskAssignRepository.UpdateTaskAssignAsync(existingTask);
 
         return (true, "Task updated successfully.");
@@ -335,10 +342,25 @@ public class TaskService : ITaskService
         if (existingTask.EndAfter < updatedTask.EndAfter)
         {
             int newTasks = (int)updatedTask.EndAfter - (int)existingTask.EndAfter;
+            int startDue = (int)existingTask.EndAfter;
+            List<TaskAssign> taskAssigns = await _taskAssignRepository.GetRecurrenceTaskAsync(existingTask.RecurrenceId!);
+            foreach(var old in taskAssigns)
+            {
+                old.EndAfter = updatedTask.EndAfter;
+                old.Description =existingTask.Description;
+                old.Status = existingTask.Status;
+                old.Priority = existingTask.Priority;
+                await _taskAssignRepository.UpdateTaskAssignAsync(old);
+            }
             existingTask.EndAfter = updatedTask.EndAfter;
+            var (startDates, dueDates) = GenerateDueDates(null,existingTask);
             for (int i = 0; i < newTasks; i++)
             {
+                existingTask.Id = 0;
+                existingTask.CreatedAt = startDates[startDue];
+                existingTask.DueDate = dueDates[startDue];
                 await _taskAssignRepository.AddTaskAssignAsync(existingTask);
+                startDue++;
             }
             message = "Task updated successfully.";
             isSuccess = true;
@@ -347,7 +369,7 @@ public class TaskService : ITaskService
         {
             // remove task which are not performed
             List<TaskAssign> taskAssigns = await _taskAssignRepository.GetRecurrenceTaskAsync(existingTask.RecurrenceId!);
-            int count = 0;
+            int count = 0; // completed tasks count
             foreach (var task in taskAssigns)
             {
                 if (task.Status != (int)Status.StatusEnum.Pending && task.CreatedAt > DateTime.Now)
@@ -362,14 +384,20 @@ public class TaskService : ITaskService
             }
             else
             {
+                int deleteTasks = (int)existingTask.EndAfter! - (int)updatedTask.EndAfter!;
                 foreach (var task in taskAssigns)
                 {
-                    if (task.Status == (int)Status.StatusEnum.Pending)
+                        task.Description =existingTask.Description;
+                        task.Status = existingTask.Status;
+                        task.Priority = existingTask.Priority;
+                        task.EndAfter = updatedTask.EndAfter;
+                    if (task.Status == (int)Status.StatusEnum.Pending && deleteTasks > 0)
                     {
-                        existingTask.Id = task.Id;
-                        existingTask.EndAfter = updatedTask.EndAfter;
-                        existingTask.IsDeleted = true;
-                        await _taskAssignRepository.UpdateTaskAssignAsync(existingTask);
+                        task.IsDeleted = true;
+                        await _taskAssignRepository.UpdateTaskAssignAsync(task);
+                        deleteTasks--;
+                    }else{
+                        await _taskAssignRepository.UpdateTaskAssignAsync(task);
                     }
                 }
                 message = "Task Updated Successfully.";

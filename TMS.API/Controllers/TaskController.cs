@@ -50,8 +50,10 @@ public class TaskController : ControllerBase
             string? sorting = Request.Form["order[0][column]"].FirstOrDefault();
             string? sortDirection = Request.Form["order[0][dir]"].FirstOrDefault();
             string? taskType = Request.Form["taskType[value]"].FirstOrDefault();
+            int? statusFilter = int.Parse(Request.Form["statusFilter[value]"].FirstOrDefault()!);
+            int? userFilter = int.Parse(Request.Form["userFilter[value]"].FirstOrDefault()!);
 
-            var (taskList, totalCount) = await _taskService.GetAllTaskAssignAsync(int.Parse(userId), role, taskType, skip, pageSize, searchValue, sorting, sortDirection);
+            var (taskList, totalCount) = await _taskService.GetAllTaskAssignAsync(int.Parse(userId), role, taskType,  statusFilter, userFilter, skip, pageSize, searchValue, sorting, sortDirection);
 
             var result = new
             {
