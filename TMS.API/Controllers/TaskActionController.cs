@@ -242,4 +242,42 @@ public class TaskActionController : ControllerBase
             throw;
         }
     }
+
+    [HttpGet("get-recurrence-tasks")]
+    [ProducesResponseType(typeof(RecurrenceTaskDto),200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> GetRecurrentTaskDetails(string recurrenceId)
+    {
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+        try
+        {
+            if (email == null || role == null || userId == null)
+            {
+                return Unauthorized();
+            }
+            RecurrenceTaskDto? recurrenceTaskData = await _taskActionService.GetRecurrentTaskDetail(recurrenceId);
+            if (recurrenceTaskData == null)
+            {
+                return NotFound("Recurrence task actions not found.");
+            }
+            if (role == "User" && recurrenceTaskData.FkUserId != null && recurrenceTaskData.FkUserId != int.Parse(userId))
+            {
+                return Unauthorized("You do not have permission to access this task action.");
+            }
+            await _logService.LogAsync("Get task action.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, recurrenceId.ToString());
+            return Ok(recurrenceTaskData); 
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Download zip file.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, recurrenceId.ToString());
+            throw;
+        }
+    }
+
 }

@@ -248,6 +248,11 @@ public class TaskAssignRepository : ITaskAssignRepository
 
     public async Task<List<TaskAssign>> GetRecurrenceTaskAsync(string recurrenceId)
     {
-        return await _context.TaskAssigns.Where(t => t.RecurrenceId == recurrenceId && t.IsDeleted == false).OrderByDescending(t => t.DueDate).ToListAsync();
+        return await _context.TaskAssigns.Where(t => t.RecurrenceId == recurrenceId && t.IsDeleted == false)
+        .Include(t => t.FkUser)
+        .Include(t => t.FkTask)
+        .Include(t => t.FkSubtask)
+        .Include(t => t.TaskActions)
+        .OrderByDescending(t => t.DueDate).ToListAsync();
     }
 }

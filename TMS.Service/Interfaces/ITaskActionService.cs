@@ -10,4 +10,5 @@ public interface ITaskActionService
     public Task<int> AddEmailTaskAsync(EmailTaskDto emailTask);
     public Task<int> AddUploadTaskAsync(UploadFileTaskDto dto);
     public Task<List<TaskFileData>?> GetTaskFileData(int id);
+    public Task<RecurrenceTaskDto> GetRecurrentTaskDetail(string recurrenceId);
 }

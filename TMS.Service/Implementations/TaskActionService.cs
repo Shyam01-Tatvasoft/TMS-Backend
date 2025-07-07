@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Transactions;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
@@ -256,5 +257,37 @@ public class TaskActionService : ITaskActionService
 
         var submittedData = JsonSerializer.Deserialize<List<TaskFileData>>((JsonElement)taskAction.SubmittedData!);
         return submittedData;
+    }
+
+    public async Task<RecurrenceTaskDto> GetRecurrentTaskDetail(string recurrenceId)
+    {
+        List<TaskAssign> taskAssigns =  await _taskAssignRepository.GetRecurrenceTaskAsync(recurrenceId);
+        TaskAssign? firstTask = taskAssigns.First();
+        taskAssigns = taskAssigns.OrderBy(t => t.DueDate).ToList();
+        List<RecurrenceTaskActionDto> recurrenceTaskActions = new();
+        foreach(var task in taskAssigns)
+        {
+            bool isReviewOrCompleted = task.Status == (int)Status.StatusEnum.Review || task.Status == (int)Status.StatusEnum.Completed;
+            recurrenceTaskActions.Add(new RecurrenceTaskActionDto{
+                TaskId = task.Id, 
+                TaskActionId = isReviewOrCompleted ? task.TaskActions.First().Id : null,
+                AssignedAt = task.CreatedAt,
+                DueDate = task.DueDate,
+                Status = ((Status.StatusEnum)task.Status!).ToDescription(),
+                SubmittedAt = isReviewOrCompleted ? task.TaskActions.First().SubmittedAt : null,
+                SubmittedData = isReviewOrCompleted ? JsonSerializer.Deserialize<JsonElement>(task.TaskActions.First().SubmittedData!) : null
+            });
+        }
+
+        RecurrenceTaskDto recurrenceTaskDetail = new(){
+            Id = recurrenceId,
+            FkUserId = taskAssigns.First().FkUserId,
+            TaskName = firstTask.FkTask?.Name,
+            SubTaskName = firstTask.FkSubtask?.Name,
+            UserName = firstTask.FkUser?.Username,
+            TaskActionList = recurrenceTaskActions,
+        };
+
+        return recurrenceTaskDetail;
     }
 }
