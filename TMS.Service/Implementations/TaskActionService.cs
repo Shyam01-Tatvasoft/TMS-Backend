@@ -284,7 +284,7 @@ public class TaskActionService : ITaskActionService
             FkUserId = taskAssigns.First().FkUserId,
             TaskName = firstTask.FkTask?.Name,
             SubTaskName = firstTask.FkSubtask?.Name,
-            UserName = firstTask.FkUser?.Username,
+            UserName = firstTask.FkUser?.FirstName + " " + firstTask.FkUser?.LastName,
             TaskActionList = recurrenceTaskActions,
         };
 

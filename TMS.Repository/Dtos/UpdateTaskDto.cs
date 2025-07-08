@@ -15,6 +15,7 @@ public class UpdateTaskDto
     public string? Description { get; set; }
     public int? FkTaskActionId { get; set; }
     public bool? IsRecurrence { get; set; }
+    public string? RecurrenceId { get; set; }
     public string? RecurrencePattern { get; set; }
     public int? RecurrenceOn { get; set; }
     public int? EndAfter { get; set; }

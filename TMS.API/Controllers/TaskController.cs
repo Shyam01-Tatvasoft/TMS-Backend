@@ -53,7 +53,7 @@ public class TaskController : ControllerBase
             int? statusFilter = int.Parse(Request.Form["statusFilter[value]"].FirstOrDefault()!);
             int? userFilter = int.Parse(Request.Form["userFilter[value]"].FirstOrDefault()!);
 
-            var (taskList, totalCount) = await _taskService.GetAllTaskAssignAsync(int.Parse(userId), role, taskType,  statusFilter, userFilter, skip, pageSize, searchValue, sorting, sortDirection);
+            var (taskList, totalCount) = await _taskService.GetAllTaskAssignAsync(int.Parse(userId), role, taskType, statusFilter, userFilter, skip, pageSize, searchValue, sorting, sortDirection);
 
             var result = new
             {
@@ -148,6 +148,70 @@ public class TaskController : ControllerBase
         catch (Exception ex)
         {
             await _logService.LogAsync("Update task.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), ex.StackTrace, JsonSerializer.Serialize(taskDto));
+            return StatusCode(500);
+        }
+    }
+
+    [HttpPost("delete-upcoming/{id}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> DeleteUpcoming(string id)
+    {
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+
+        try
+        {
+            if (email == null || role == null || userId == null)
+                return Unauthorized();
+
+            var (success, message) = await _taskService.DeleteUpcomingRecurrenceTask(id);
+            if (!success)
+                return BadRequest(message);
+            await _logService.LogAsync("Delete next recurrent tasks.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, id);
+            return Ok(message);
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Delete next recurrent tasks.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), ex.StackTrace, id);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpPost("delete-recurrence/{id}")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> DeleteRecurrence(string id)
+    {
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+
+        try
+        {
+            if (email == null || role == null || userId == null)
+                return Unauthorized();
+
+            var (success, message) = await _taskService.DeleteRecurrence(id);
+            if (!success)
+                return BadRequest(message);
+            await _logService.LogAsync("Delete entire recurrence.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, id);
+            return Ok(message);
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Delete entire recurrence.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), ex.StackTrace, id);
             return StatusCode(500);
         }
     }
@@ -306,7 +370,7 @@ public class TaskController : ControllerBase
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
-    public async Task<IActionResult> GetTaskChartData([FromBody]TaskGraphFilterDto filter)
+    public async Task<IActionResult> GetTaskChartData([FromBody] TaskGraphFilterDto filter)
     {
         string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         if (string.IsNullOrEmpty(authToken))
@@ -314,7 +378,7 @@ public class TaskController : ControllerBase
             return Unauthorized();
         }
         var (email, role, userId) = _jwtService.ValidateToken(authToken);
-        if(role == "User")
+        if (role == "User")
             return Forbid();
 
         int id = int.Parse(userId!);

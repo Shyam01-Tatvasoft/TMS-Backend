@@ -15,4 +15,6 @@ public interface ITaskService
     public Task<TaskAssign> ReassignTask(ReassignTaskDto dto);
     public Task<List<TaskAssignDto>> GetTasksForSchedular(DateTime start, DateTime end, string role, int userId);
     public Task<List<TaskGraphDto>> GetTaskChartData(TaskGraphFilterDto filter);
+    public Task<(bool, string)> DeleteUpcomingRecurrenceTask(string recurrenceId);
+    public Task<(bool, string)> DeleteRecurrence(string recurrenceId);
 }

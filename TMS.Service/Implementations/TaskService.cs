@@ -84,6 +84,7 @@ public class TaskService : ITaskService
                 Description = taskAssign.Description,
                 FkTaskActionId = taskAction != null ? taskAction.Id : 0,
                 IsRecurrence = taskAssign.IsRecurrence,
+                RecurrenceId = taskAssign.RecurrenceId,
                 RecurrencePattern = taskAssign.RecurrencePattern != null ? ((Recurrence.RecurrenceEnum)taskAssign.RecurrencePattern).ToDescription() : null,
                 RecurrenceOn = taskAssign.RecurrenceOn,
                 RecurrenceTo = taskAssign.RecurrenceTo != null ? taskAssign.RecurrenceTo : null,
@@ -140,7 +141,7 @@ public class TaskService : ITaskService
                 _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
                 await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, "New Task Assigned!");
                 transaction.Complete();
-                return (newTask.Id, "Task assigned successfully.");
+                return (newTask!.Id, "Task assigned successfully.");
             }
         }
         catch (System.Exception)
@@ -168,7 +169,7 @@ public class TaskService : ITaskService
             return (0, "End after must be greater than 0 and less than 100.");
 
         //Generate due dates and start dates
-        var (startDates, dueDates) = GenerateDueDates(task,null);
+        var (startDates, dueDates) = GenerateDueDates(task, null);
 
         // Fetch all holidays in a single time
         var holidays = await _holidayService.GetHolidaysAsync(isoCode, dueDates.Min(), dueDates.Max());
@@ -202,15 +203,17 @@ public class TaskService : ITaskService
     }
 
 
-    private static (List<DateTime>, List<DateTime>) GenerateDueDates(AddTaskDto? addTask,TaskAssign? editTask)
+    private static (List<DateTime>, List<DateTime>) GenerateDueDates(AddTaskDto? addTask, TaskAssign? editTask)
     {
         List<DateTime> startDates = new();
         List<DateTime> dueDates = new();
         dynamic task = addTask != null ? new AddTaskDto() : new TaskAssign();
-        if(addTask != null)
+        if (addTask != null)
         {
             task = addTask;
-        }else{
+        }
+        else
+        {
             task = editTask ?? throw new ArgumentNullException(nameof(editTask));
         }
         DateTime startDate = DateTime.SpecifyKind(task.RecurrenceTo.Date, DateTimeKind.Local);
@@ -320,7 +323,6 @@ public class TaskService : ITaskService
 
         existingTask.Description = task.Description;
         existingTask.TaskData = JsonSerializer.Serialize(task.TaskData);
-        existingTask.Status = task.Status;
         existingTask.Priority = task.Priority;
 
         if (existingTask.IsRecurrence == true && task.EndAfter != null && existingTask.EndAfter != task.EndAfter)
@@ -328,6 +330,7 @@ public class TaskService : ITaskService
             return await HandleRecurrentTaskUpdate(existingTask, task);
         }
 
+        existingTask.Status = task.Status;
         existingTask.DueDate = task.DueDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
         await _taskAssignRepository.UpdateTaskAssignAsync(existingTask);
 
@@ -339,27 +342,41 @@ public class TaskService : ITaskService
         string message;
         bool isSuccess;
 
-        if (existingTask.EndAfter < updatedTask.EndAfter)
-        {
-            int newTasks = (int)updatedTask.EndAfter - (int)existingTask.EndAfter;
-            int startDue = (int)existingTask.EndAfter;
             List<TaskAssign> taskAssigns = await _taskAssignRepository.GetRecurrenceTaskAsync(existingTask.RecurrenceId!);
-            foreach(var old in taskAssigns)
+        if (taskAssigns.Count < updatedTask.EndAfter)
+        {
+            int newTasks = (int)updatedTask.EndAfter - taskAssigns.Count;
+            foreach (var old in taskAssigns)
             {
                 old.EndAfter = updatedTask.EndAfter;
-                old.Description =existingTask.Description;
-                old.Status = existingTask.Status;
+                old.Description = existingTask.Description;
                 old.Priority = existingTask.Priority;
                 await _taskAssignRepository.UpdateTaskAssignAsync(old);
             }
+            int startDue = taskAssigns.Count;
             existingTask.EndAfter = updatedTask.EndAfter;
-            var (startDates, dueDates) = GenerateDueDates(null,existingTask);
+            var (startDates, dueDates) = GenerateDueDates(null, taskAssigns.Last());
             for (int i = 0; i < newTasks; i++)
             {
-                existingTask.Id = 0;
-                existingTask.CreatedAt = startDates[startDue];
-                existingTask.DueDate = dueDates[startDue];
-                await _taskAssignRepository.AddTaskAssignAsync(existingTask);
+                TaskAssign newTask = new(){
+                    CreatedAt = startDates[startDue],
+                    Description = existingTask.Description,
+                    DueDate = dueDates[startDue],
+                    EndAfter = existingTask.EndAfter,
+                    FkSubtaskId = existingTask.FkSubtaskId,
+                    FkTaskId = existingTask.FkTaskId,
+                    FkUserId = existingTask.FkUserId,
+                    IsDeleted = false,
+                    IsRecurrence = true,
+                    RecurrenceId = existingTask.RecurrenceId,
+                    Priority = existingTask.Priority,
+                    RecurrenceOn =existingTask.RecurrenceOn,
+                    RecurrencePattern = existingTask.RecurrencePattern,
+                    RecurrenceTo = existingTask.RecurrenceTo,
+                    Status = (int)Status.StatusEnum.Pending,
+                    TaskData = existingTask.TaskData
+                };
+                await _taskAssignRepository.AddTaskAssignAsync(newTask);
                 startDue++;
             }
             message = "Task updated successfully.";
@@ -368,7 +385,7 @@ public class TaskService : ITaskService
         else
         {
             // remove task which are not performed
-            List<TaskAssign> taskAssigns = await _taskAssignRepository.GetRecurrenceTaskAsync(existingTask.RecurrenceId!);
+            // List<TaskAssign> taskAssigns = await _taskAssignRepository.GetRecurrenceTaskAsync(existingTask.RecurrenceId!);
             int count = 0; // completed tasks count
             foreach (var task in taskAssigns)
             {
@@ -387,16 +404,17 @@ public class TaskService : ITaskService
                 int deleteTasks = (int)existingTask.EndAfter! - (int)updatedTask.EndAfter!;
                 foreach (var task in taskAssigns)
                 {
-                        task.Description =existingTask.Description;
-                        task.Status = existingTask.Status;
-                        task.Priority = existingTask.Priority;
-                        task.EndAfter = updatedTask.EndAfter;
-                    if (task.Status == (int)Status.StatusEnum.Pending && deleteTasks > 0)
+                    task.Description = existingTask.Description;
+                    task.Priority = existingTask.Priority;
+                    task.EndAfter = updatedTask.EndAfter;
+                    if (task.Status == (int)Status.StatusEnum.Pending && task.CreatedAt > DateTime.Now && deleteTasks > 0)
                     {
                         task.IsDeleted = true;
                         await _taskAssignRepository.UpdateTaskAssignAsync(task);
                         deleteTasks--;
-                    }else{
+                    }
+                    else
+                    {
                         await _taskAssignRepository.UpdateTaskAssignAsync(task);
                     }
                 }
@@ -405,6 +423,38 @@ public class TaskService : ITaskService
             }
         }
         return (isSuccess, message);
+    }
+
+    public async Task<(bool, string)> DeleteUpcomingRecurrenceTask(string recurrenceId)
+    {
+        List<TaskAssign> recurrenceTasks = await _taskAssignRepository.GetRecurrenceTaskAsync(recurrenceId!);
+        if(recurrenceTasks.Count == 0)
+            return (false, "No next recurrence found.");
+        recurrenceTasks = recurrenceTasks.OrderBy(t => t.CreatedAt).ToList();
+        int count = 0;
+        foreach (var task in recurrenceTasks)
+        {
+            if (task.CreatedAt > DateTime.Now)
+            {
+                task.IsDeleted = true;
+                await _taskAssignRepository.UpdateTaskAssignAsync(task);
+                count++;
+            }
+        }
+        if(count == 0)
+            return (false, "No next recurrence found.");
+        return (true, "Next recurrence is deleted.");
+    }
+
+    public async Task<(bool, string)> DeleteRecurrence(string recurrenceId)
+    {
+        List<TaskAssign> recurrenceTasks = await _taskAssignRepository.GetRecurrenceTaskAsync(recurrenceId!);
+        foreach (var task in recurrenceTasks)
+        {
+            task.IsDeleted = true;
+            await _taskAssignRepository.UpdateTaskAssignAsync(task);
+        }
+        return (true, "Entire Recurrence is deleted.");
     }
 
     public async Task<string> GetTaskEmailBody(int id, string templateName = "TaskEmailTemplate")
@@ -419,11 +469,11 @@ public class TaskService : ITaskService
 
         string emailBody = System.IO.File.ReadAllText(templatePath);
 
-        emailBody = emailBody.Replace("{{UserName}}", task?.FkUser.FirstName + " " + task.FkUser.LastName ?? "User");
+        emailBody = emailBody.Replace("{{UserName}}", task?.FkUser?.FirstName + " " + task?.FkUser?.LastName ?? "User");
         emailBody = emailBody.Replace("{{TaskType}}", task.FkTask?.Name ?? "-");
         emailBody = emailBody.Replace("{{SubTask}}", task.FkSubtask?.Name ?? "-");
-        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority.Value!).ToString() ?? "-");
-        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status.Value!).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Priority}}", ((Priority.PriorityEnum)task?.Priority!.Value!).ToString() ?? "-");
+        emailBody = emailBody.Replace("{{Status}}", ((Status.StatusEnum)task?.Status!.Value!).ToString() ?? "-");
         emailBody = emailBody.Replace("{{DueDate}}", task.DueDate.ToString("dd MMM yyyy"));
         emailBody = emailBody.Replace("{{Description}}", task.Description ?? "-");
 
