@@ -31,6 +31,8 @@ public partial class User
 
     public string? ProfileImage { get; set; }
 
+    public bool? IsTwoFaEnabled { get; set; }
+
     public virtual Country? FkCountry { get; set; }
 
     public virtual CountryTimezone? FkCountryTimezoneNavigation { get; set; }

@@ -17,4 +17,5 @@ public interface ITaskService
     public Task<List<TaskGraphDto>> GetTaskChartData(TaskGraphFilterDto filter);
     public Task<(bool, string)> DeleteUpcomingRecurrenceTask(string recurrenceId);
     public Task<(bool, string)> DeleteRecurrence(string recurrenceId);
+    public Task<List<StatusChartResultDto>> GetStatusChartData(StatusChartFilterDto filter);
 }

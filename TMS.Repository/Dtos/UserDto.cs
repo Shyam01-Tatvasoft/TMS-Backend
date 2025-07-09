@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.CompilerServices;
 
 namespace TMS.Repository.Dtos;
 
@@ -16,10 +17,10 @@ public class UserDto
 
     public string? Phone { get; set; }
 
-    public string? CountryName {get; set; }
+    public string? CountryName { get; set; }
 
     public string? TimezoneName { get; set; }
-    
+
     public int? FkCountryId { get; set; }
 
     public int? FkCountryTimezone { get; set; }
@@ -33,4 +34,6 @@ public class UserDto
     public string? ProfileImagePath { get; set; }
 
     public DateTime? ModifiedAt { get; set; }
+
+    public bool? IsTwoFaEnabled { get; set; }
 }

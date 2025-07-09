@@ -11,4 +11,6 @@ public interface IAuthenticationService
     public Task<string?> ValidateResetToken(string token,string validationType);
    public Task<User> ResetPasswordAsync(string email, ResetPasswordDto dto);
     public Task<(string,int)>  ForgotPassword(string email);
+    public Task<bool> SendOtp(string email);
+    public Task<(bool,string)> VerifyOtp(OtpModel model);
 }

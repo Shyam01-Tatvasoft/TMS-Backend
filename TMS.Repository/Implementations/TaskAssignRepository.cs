@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Text.Json;
@@ -137,7 +138,7 @@ public class TaskAssignRepository : ITaskAssignRepository
 
         return (tasks, totalCount);
     }
-    
+
     public async Task<TaskAssign?> GetTaskAssignAsync(int id)
     {
         return await _context.TaskAssigns.Where(t => t.Id == id)
@@ -259,5 +260,27 @@ public class TaskAssignRepository : ITaskAssignRepository
         .Include(t => t.FkSubtask)
         .Include(t => t.TaskActions)
         .OrderByDescending(t => t.DueDate).ToListAsync();
+    }
+
+    public async Task<List<StatusChartResultDto>> GetStatusChartAsync(StatusChartFilterDto filter)
+    {
+        var query = _context.TaskAssigns
+       .Where(t => t.IsDeleted != true && t.FkUserId == filter.UserId)
+       .AsQueryable();
+
+        if (filter.Status != 0)
+            query = query.Where(t => t.Status == filter.Status);
+
+        if (filter.FromDate.HasValue && filter.ToDate.HasValue)
+            query = query.Where(t => t.CreatedAt >= filter.FromDate.Value && t.CreatedAt <= filter.ToDate.Value);
+
+        var statusGroups = await query
+            .GroupBy(t => t.Status)
+            .Select(g => new StatusChartResultDto
+            {
+                StatusLabel = ((Status.StatusEnum)g.Key!).ToDescription(),
+                Count = g.Count()
+            }).ToListAsync();
+        return statusGroups;
     }
 }

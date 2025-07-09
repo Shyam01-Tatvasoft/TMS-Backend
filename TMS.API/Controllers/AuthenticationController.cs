@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
+using TMS.Service.Helpers;
 using TMS.Service.Interfaces;
 
 namespace TMS.API.Controllers;
@@ -49,6 +50,14 @@ public class AuthenticationController : ControllerBase
             {
                 _response.IsSuccess = false;
                 _response.ErrorMessage = new List<string> { "Invalid Credentials" };
+                return Ok(_response);
+            }
+            if (user.IsTwoFaEnabled == true)
+            {
+                _response.StatusCode = System.Net.HttpStatusCode.OK;
+                _response.IsSuccess = true;
+                _response.Result = new { token = "", loginUser = user };
+                await _logService.LogAsync("User logged in.", user.Id, Repository.Enums.Log.LogEnum.Login.ToString(), string.Empty, dto.Email);
                 return Ok(_response);
             }
             string token = await _jwtService.GenerateToken(user.Email.ToString(), dto.RememberMe);
@@ -182,7 +191,7 @@ public class AuthenticationController : ControllerBase
                 _response.StatusCode = HttpStatusCode.BadRequest;
                 _response.IsSuccess = false;
                 _response.ErrorMessage = new List<string> { "Failed to reset password" };
-                await _logService.LogAsync("Setup password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(),"", JsonSerializer.Serialize(dto));
+                await _logService.LogAsync("Setup password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), "", JsonSerializer.Serialize(dto));
                 return BadRequest(_response);
             }
 
@@ -193,7 +202,7 @@ public class AuthenticationController : ControllerBase
         }
         catch (System.Exception ex)
         {
-            await _logService.LogAsync("Setup password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(),ex.StackTrace, JsonSerializer.Serialize(dto));
+            await _logService.LogAsync("Setup password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(dto));
             throw;
         }
     }
@@ -230,9 +239,57 @@ public class AuthenticationController : ControllerBase
         catch (System.Exception ex)
         {
             await _logService.LogAsync("Forgot password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, dto.Email);
-            throw;
+            return StatusCode(500);
+        }
+    }
+
+    [HttpPost("send-otp")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SendOtp([FromBody] string email)
+    {
+        try
+        {
+            bool isSent = await _autService.SendOtp(email);
+            if (isSent)
+            {
+                await _logService.LogAsync("Send OTP.", 0, Repository.Enums.Log.LogEnum.Create.ToString(), string.Empty, email);
+                return Ok("OTP sent.");
+            }
+            else
+                return BadRequest();
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Send OTP.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, email);
+            return StatusCode(500);
         }
     }
 
 
+    [HttpPost("verify-otp")]
+    public async Task<IActionResult> VerifyOtp([FromBody] OtpModel model)
+    {
+        try
+        {
+            var (success, message) = await _autService.VerifyOtp(model);
+
+            if (success)
+            {
+                string token = await _jwtService.GenerateToken(model.Email.ToString(), true);
+                await _logService.LogAsync("Verify OTP.", 0, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, JsonSerializer.Serialize(model));
+                return Ok(token);
+            }
+            else
+            {
+                return BadRequest(message);
+            }
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Verify OTP.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(model));
+            return StatusCode(500);
+        }
+    }
 }

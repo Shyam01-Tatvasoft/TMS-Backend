@@ -57,6 +57,8 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<UserOtp> UserOtps { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseNpgsql("Host=localhost;Database=tms;Username=postgres;Password=Tatva@123");
@@ -489,6 +491,9 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.IsDeleted)
                 .HasDefaultValueSql("false")
                 .HasColumnName("is_deleted");
+            entity.Property(e => e.IsTwoFaEnabled)
+                .HasDefaultValueSql("false")
+                .HasColumnName("is_two_fa_enabled");
             entity.Property(e => e.LastName)
                 .HasMaxLength(100)
                 .HasColumnName("last_name");
@@ -518,6 +523,28 @@ public partial class TmsContext : DbContext
             entity.HasOne(d => d.FkRole).WithMany(p => p.Users)
                 .HasForeignKey(d => d.FkRoleId)
                 .HasConstraintName("user_fk_role_id_fkey");
+        });
+
+        modelBuilder.Entity<UserOtp>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("user_otp_pkey");
+
+            entity.ToTable("user_otp");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+            entity.Property(e => e.Email)
+                .HasMaxLength(200)
+                .HasColumnName("email");
+            entity.Property(e => e.ExpiryTime)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("expiry_time");
+            entity.Property(e => e.OtpHash)
+                .HasMaxLength(100)
+                .HasColumnName("otp_hash");
         });
 
         OnModelCreatingPartial(modelBuilder);

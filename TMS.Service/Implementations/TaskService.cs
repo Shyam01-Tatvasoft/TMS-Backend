@@ -552,4 +552,9 @@ public class TaskService : ITaskService
     {
         return await _taskAssignRepository.GetTaskChartDataAsync(filter);
     }
+
+    public async Task<List<StatusChartResultDto>> GetStatusChartData(StatusChartFilterDto filter)
+    {
+        return await _taskAssignRepository.GetStatusChartAsync(filter);
+    }
 }

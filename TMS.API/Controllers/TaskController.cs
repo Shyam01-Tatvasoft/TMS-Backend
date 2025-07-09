@@ -370,6 +370,7 @@ public class TaskController : ControllerBase
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
     [ProducesResponseType(403)]
+    [ProducesResponseType(500)]
     public async Task<IActionResult> GetTaskChartData([FromBody] TaskGraphFilterDto filter)
     {
         string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
@@ -393,7 +394,40 @@ public class TaskController : ControllerBase
         catch (System.Exception ex)
         {
             await _logService.LogAsync("Get task analysis.", id, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(filter));
-            throw;
+            return StatusCode(500);
+        }
+    }
+
+    [HttpPost("status-chart-data")]
+    [ProducesResponseType(typeof(List<StatusChartResultDto>), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> GetStatusChartData([FromBody] StatusChartFilterDto filter)
+    {
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+        if (role == "User")
+            return Forbid();
+
+        int id = int.Parse(userId!);
+        if (email == null || role == null || userId == null)
+            return Unauthorized();
+        try
+        {
+            List<StatusChartResultDto> chartData = await _taskService.GetStatusChartData(filter);
+            await _logService.LogAsync("Get status chart analysis.", id, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, JsonSerializer.Serialize(filter));
+            return Ok(chartData);
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Get status chart analysis.", id, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(filter));
+            return StatusCode(500);
         }
     }
 }

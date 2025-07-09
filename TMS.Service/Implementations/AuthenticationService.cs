@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.DataProtection;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Repository.Interfaces;
+using TMS.Service.Helpers;
 using TMS.Service.Interfaces;
 
 namespace TMS.Service.Implementations;
@@ -15,16 +16,19 @@ namespace TMS.Service.Implementations;
 public class AuthenticationService : IAuthenticationService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IUserOtpRepository _userOtpRepository;
+    private readonly IEmailService _emailService;
     //  private readonly IMapper _mapper;
     private readonly IDataProtector _dataProtector;
-    public AuthenticationService(IUserRepository userRepository, IDataProtectionProvider dataProtectionProvider)
+    public AuthenticationService(IUserRepository userRepository, IDataProtectionProvider dataProtectionProvider, IUserOtpRepository userOtpRepository, IEmailService emailService)
     {
         _userRepository = userRepository;
         _dataProtector = dataProtectionProvider.CreateProtector("ResetPasswordProtector");
-
+        _userOtpRepository = userOtpRepository;
+        _emailService = emailService;
     }
 
-    public async Task<(string,int)> RegisterAsync(UserRegisterDto dto)
+    public async Task<(string, int)> RegisterAsync(UserRegisterDto dto)
     {
         var existing = await _userRepository.GetByEmailAsync(dto.Email);
         if (existing != null) return ("Email already registered.", existing.Id);
@@ -51,10 +55,10 @@ public class AuthenticationService : IAuthenticationService
         string subject = "Password setup request";
         string body = GetEmailTemplate(resetLink, "SetupPasswordTemplate");
         SendMail(dto.Email, subject, body);
-        return ("Account created successfully.",user.Id);
+        return ("Account created successfully.", user.Id);
     }
 
-    public async Task<(string,int)> ForgotPassword(string email)
+    public async Task<(string, int)> ForgotPassword(string email)
     {
         var existing = await _userRepository.GetByEmailAsync(email);
         if (existing == null) return ("User not Exist.", 0);
@@ -64,7 +68,7 @@ public class AuthenticationService : IAuthenticationService
         string subject = "Password reset request";
         string body = GetEmailTemplate(resetLink, "ForgotPasswordTemplate");
         SendMail(email, subject, body);
-        return ("Mail sent successfully.",existing.Id);
+        return ("Mail sent successfully.", existing.Id);
     }
 
     public async Task<User> ResetPasswordAsync(string email, ResetPasswordDto dto)
@@ -86,7 +90,7 @@ public class AuthenticationService : IAuthenticationService
             Username = user.Username
         };
         bool response = await _userRepository.UpdateAsync(userData);
-        if(response)
+        if (response)
             return user;
         else
             return null!;
@@ -109,8 +113,48 @@ public class AuthenticationService : IAuthenticationService
             Role = user.FkRole.Name,
             CountryName = user.FkCountry?.Name,
             TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
+            IsTwoFaEnabled = user.IsTwoFaEnabled
         };
+
+        if (user.IsTwoFaEnabled == true)
+        {
+            await SendOtp(dto.Email);
+        }
         return userData;
+    }
+
+    public async Task<bool> SendOtp(string email)
+    {
+        var otp = OtpHelper.GenerateOtp(); // e.g., "124567"
+        var otpHash = HashHelper.HashString(otp);
+
+        // Save new OTP
+        var userOtp = new UserOtp
+        {
+            Email = email,
+            OtpHash = otpHash,
+            ExpiryTime = DateTime.Now.AddMinutes(5)
+        };
+        int id = await _userOtpRepository.AddOtpAsync(userOtp);
+        if (id <= 0)
+            return false;
+
+        _emailService.SendMail(email, "Verify your otp", $"Your OTP is: {otp}");
+
+        return true;
+    }
+
+    public async Task<(bool,string)> VerifyOtp(OtpModel model)
+    {
+         var record = await _userOtpRepository.GetAsync(model.Email);
+
+        if (record == null || record.ExpiryTime < DateTime.UtcNow)
+            return (false,"OTP expired or not found.");
+
+        if (!HashHelper.VerifyHash(model.OTP, record.OtpHash))
+            return (false,"Invalid OTP.");
+
+        return (true,"OTP is valid.");
     }
 
     private static string HashPassword(string password)
