@@ -12,4 +12,5 @@ public interface IUserRepository
     public Task<(List<UserDto>,int count)> GetUsers(int skip, int take, string? search, string? sorting = null, string? sortDirection = null);
     public Task<bool> UpdateAsync(AddEditUserDto user);
     public Task<User?> GetByIdAsync(int id);
+    public Task<bool> UpdateUserAsync(User user);
 }

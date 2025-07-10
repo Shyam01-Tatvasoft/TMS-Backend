@@ -479,6 +479,9 @@ public partial class TmsContext : DbContext
             entity.HasIndex(e => e.Username, "user_unique").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AuthType)
+                .HasDefaultValueSql("1")
+                .HasColumnName("auth_type");
             entity.Property(e => e.Email)
                 .HasMaxLength(200)
                 .HasColumnName("email");
@@ -500,6 +503,9 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.ModifiedAt)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("modified_at");
+            entity.Property(e => e.OtpSecret)
+                .HasMaxLength(100)
+                .HasColumnName("otp_secret");
             entity.Property(e => e.Password)
                 .HasMaxLength(200)
                 .HasColumnName("password");

@@ -36,4 +36,8 @@ public class UserDto
     public DateTime? ModifiedAt { get; set; }
 
     public bool? IsTwoFaEnabled { get; set; }
+
+    public int? AuthType { get; set; }
+
+    public bool HasSecret { get; set; }
 }

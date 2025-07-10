@@ -33,6 +33,10 @@ public partial class User
 
     public bool? IsTwoFaEnabled { get; set; }
 
+    public string? OtpSecret { get; set; }
+
+    public int? AuthType { get; set; }
+
     public virtual Country? FkCountry { get; set; }
 
     public virtual CountryTimezone? FkCountryTimezoneNavigation { get; set; }

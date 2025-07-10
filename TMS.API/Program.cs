@@ -48,6 +48,7 @@ builder.Services.AddScoped<IHolidayService, HolidayService>();
 builder.Services.AddScoped<ITaskActionService, TaskActionService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<ITaskReminderService, TaskReminderService>();
+builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddHttpClient<HolidayService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();

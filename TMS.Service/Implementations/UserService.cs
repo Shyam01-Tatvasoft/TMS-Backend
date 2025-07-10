@@ -71,6 +71,9 @@ public class UserService : IUserService
             CountryName = user.FkCountry?.Name,
             TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
             ProfileImagePath = user.ProfileImage,
+            IsTwoFaEnabled = user.IsTwoFaEnabled,
+            AuthType = user.AuthType,
+            HasSecret = !string.IsNullOrEmpty(user.OtpSecret),
         };
         return userData;
         // return _mapper.Map<UserDto>(user);

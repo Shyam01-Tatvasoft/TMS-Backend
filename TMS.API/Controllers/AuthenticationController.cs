@@ -1,4 +1,5 @@
 using System.Net;
+using System.Reflection.Metadata.Ecma335;
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
@@ -289,6 +290,99 @@ public class AuthenticationController : ControllerBase
         catch (System.Exception ex)
         {
             await _logService.LogAsync("Verify OTP.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(model));
+            return StatusCode(500);
+        }
+    }
+
+    [HttpPost("setup")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> Setup2Fa([FromBody] SetupAuthDto dto)
+    {
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+            return Unauthorized();
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+        try
+        {
+            var (qrImage, secret) = await _autService.Setup2FA(dto);
+            await _logService.LogAsync("Setup 2FA using External Authenticator App.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(dto));
+            if (dto.AuthType == 3 && qrImage != null)
+            {
+                return Ok(new { qrImage, secret });
+            }
+            else if (dto.AuthType == 2)
+            {
+                return Ok();
+            }
+            else
+            {
+                return BadRequest();
+            }
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Setup 2FA using External Authenticator App.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(dto));
+            return StatusCode(500);
+        }
+    }
+
+
+    [HttpPost("enable")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> Enable2fa([FromBody] Enable2FaDto dto)
+    {
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+            return Unauthorized();
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+        try
+        {
+            bool isEnabled = await _autService.Enable2Fa(dto);
+            if(!isEnabled)
+            {
+                await _logService.LogAsync("Enable 2FA using External Authenticator App.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(dto));
+                return BadRequest("In Valid Code please try again.");
+            }
+            return Ok();
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Enable 2FA using External Authenticator App.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(dto));
+            return StatusCode(500);
+        }
+    }
+
+
+    [HttpPost("login/2fa")]
+    [AllowAnonymous]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> Login2fa([FromBody] OtpModel dto)
+    {
+        try
+        {
+            bool result = await _autService.Login2Fa(dto);
+            if (result)
+            {
+                string token = await _jwtService.GenerateToken(dto.Email.ToString(), true);
+                await _logService.LogAsync("Login 2FA Authenticator App.", 0, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, JsonSerializer.Serialize(dto));
+                return Ok(token);
+            }
+            else
+            {
+                return BadRequest("In Valid Code.");
+            }
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Login 2FA Authenticator App.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(dto));
             return StatusCode(500);
         }
     }
