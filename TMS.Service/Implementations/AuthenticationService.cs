@@ -76,7 +76,7 @@ public class AuthenticationService : IAuthenticationService
     public async Task<User> ResetPasswordAsync(string email, ResetPasswordDto dto)
     {
         User? user = await _userRepository.GetByEmailAsync(email);
-        user.Password = HashPassword(dto.NewPassword);
+        user!.Password = HashPassword(dto.NewPassword);
         AddEditUserDto userData = new()
         {
             Id = user.Id,
@@ -160,24 +160,18 @@ public class AuthenticationService : IAuthenticationService
         return (true, "OTP is valid.");
     }
 
-    public async Task<(string?, string?)> Setup2FA(SetupAuthDto dto)
+    public async Task<string?> Setup2FA(SetupAuthDto dto)
     {
         User? user = await _userRepository.GetByEmailAsync(dto.Email);
-        if (user == null) return (null, null);
-        if (dto.AuthType > 3) return (null, null);
-        string? secret = null;
+        if (user == null) return null;
+        if (dto.AuthType > 3) return null;
         string? qrImage = null;
 
         if (dto.IsEnabled)
         {
-            if (dto.AuthType == 3)
+            if (dto.AuthType == (int)AuthType.AuthTypeEnum.AuthenticatorApp)
             {
-                if(string.IsNullOrEmpty(user.OtpSecret))
-                {
-                    secret = _otpService.GenerateSecret();
-                    user.OtpSecret = secret;
-                }
-                qrImage = _otpService.GenerateQrCodeUri(user.Username, user.OtpSecret!);
+                qrImage = _otpService.GenerateQrCodeUri(user.Username, user.Email!, "TMS");
             }
             else
             {
@@ -188,21 +182,20 @@ public class AuthenticationService : IAuthenticationService
         else
         {
             user.IsTwoFaEnabled = false;
-            user.OtpSecret = string.Empty;
             user.AuthType = 1;
         }
 
         await _userRepository.UpdateUserAsync(user);
 
-        return (qrImage, secret);
+        return qrImage;
     }
 
     public async Task<bool> Enable2Fa(Enable2FaDto dto)
     {
         var user = await _userRepository.GetByEmailAsync(dto.Email);
-        if (user == null || user.OtpSecret == null) return false;
+        if (user == null || user.Email == null) return false;
 
-        if (!_otpService.Validate(user.OtpSecret, dto.Code))
+        if (!_otpService.Validate(user.Email, dto.Code))
             return false;
 
         user.IsTwoFaEnabled = true;
@@ -215,7 +208,7 @@ public class AuthenticationService : IAuthenticationService
     public async Task<bool> Login2Fa(OtpModel dto)
     {
         User? user = await _userRepository.GetByEmailAsync(dto.Email);
-        if (user == null || user.OtpSecret == null || !_otpService.Validate(user.OtpSecret, dto.OTP))
+        if (user == null || user.Email == null || !_otpService.Validate(user.Email, dto.OTP))
             return false;
         return true;
     }

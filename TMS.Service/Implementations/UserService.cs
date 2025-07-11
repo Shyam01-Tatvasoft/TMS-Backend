@@ -14,12 +14,10 @@ public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
     private readonly ITaskActionRepository _taskActionRepository;
-    // private readonly IMapper _mapper;
     public UserService(IUserRepository userRepository, ITaskActionRepository taskActionRepository)
     {
         _userRepository = userRepository;
         _taskActionRepository = taskActionRepository;
-        // _mapper = mapper;
     }
 
     public async Task<List<UserDto>> GetUsers()
@@ -73,7 +71,6 @@ public class UserService : IUserService
             ProfileImagePath = user.ProfileImage,
             IsTwoFaEnabled = user.IsTwoFaEnabled,
             AuthType = user.AuthType,
-            HasSecret = !string.IsNullOrEmpty(user.OtpSecret),
         };
         return userData;
         // return _mapper.Map<UserDto>(user);

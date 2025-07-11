@@ -29,5 +29,5 @@ public class TaskAssignDto
 
     public string SubTaskName { get; set; } = string.Empty;
 
-    public int TaskActionId { get; set; }
+    public int? TaskActionId { get; set; }
 }

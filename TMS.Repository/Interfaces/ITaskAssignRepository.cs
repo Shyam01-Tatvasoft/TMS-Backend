@@ -16,4 +16,5 @@ public interface ITaskAssignRepository
     public Task<List<TaskGraphDto>> GetTaskChartDataAsync(TaskGraphFilterDto filter);
     public Task<List<TaskAssign>> GetRecurrenceTaskAsync(string recurrenceId);
     public Task<List<StatusChartResultDto>> GetStatusChartAsync(StatusChartFilterDto filter);
+    public Task<List<TaskAssignDto>> GetFilteredTaskForPdfAsync(TaskFilterDto filterDto);
 }

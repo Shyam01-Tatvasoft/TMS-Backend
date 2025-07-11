@@ -1,0 +1,72 @@
+@model List<TaskAssignDto>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+    using TMS.Repository.Dtos;
+#line default
+e default
+e default
+    }
+        .header img {
+            height: 50px;
+        }
+        .header h2 {
+            margin: 10px 0 0 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #000;
+            padding: 6px;
+            word-wrap: break-word;
+            text-align: center;
+        }
+        th {
+            background-color: #f1f1f1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>TMS - Task Management System</h2>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>User Name</th>
+                <th>Task Name</th>
+                <th>Sub Task</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>DueDate</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var task in Model)
+            {
+                <tr>
+                    <td>@task.UserName</td>
+                    <td>@task.TaskName</td>
+                    <td>@task.SubTaskName</td>
+                    <td>@task.Status</td>
+                    <td>@task.Priority</td>
+                    <td>@task.DueDate.ToString("yyyy-MM-dd")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</body>
+</html>

@@ -283,4 +283,55 @@ public class TaskAssignRepository : ITaskAssignRepository
             }).ToListAsync();
         return statusGroups;
     }
+
+    public async Task<List<TaskAssignDto>> GetFilteredTaskForPdfAsync(TaskFilterDto filterDto)
+    {
+        var query = _context.TaskAssigns.AsQueryable();
+
+        // Filter by TaskType if provided
+        if (!string.IsNullOrEmpty(filterDto.TaskType))
+        {
+            if (filterDto.TaskType == "recurrence")
+                query = query.Where(t => t.IsRecurrence == true);
+        }
+
+        // Filter by StatusFilter if provided
+        if (filterDto.StatusFilter.HasValue && filterDto.StatusFilter != 0)
+        {
+            query = query.Where(t => t.Status == filterDto.StatusFilter);
+        }
+
+        // Filter by UserFilter (assuming UserId or some user-related property) if provided
+        if (filterDto.UserFilter.HasValue && filterDto.UserFilter != 0)
+        {
+            query = query.Where(t => t.FkUserId == filterDto.UserFilter.Value);
+        }
+
+        // Filter by Priority if provided
+        if (filterDto.PriorityFilter.HasValue && filterDto.PriorityFilter != 0)
+        {
+            query = query.Where(t => t.Priority == filterDto.PriorityFilter.Value);
+        }
+
+        // Select and map to TaskAssignDto
+        var taskAssignDtos = await query.Select(t => new TaskAssignDto
+        {
+            Id = t.Id,
+            Description = t.Description,
+            UserName = t.FkUser != null ? (t.FkUser.FirstName + " " + t.FkUser.LastName) : null,
+            DueDate = t.DueDate,
+            Status = t.Status.HasValue ? ((Status.StatusEnum)t.Status).ToDescription() : null,
+            Priority = t.Priority.HasValue ? ((Priority.PriorityEnum)t.Priority).ToDescription() : null,
+            CreatedAt = t.CreatedAt,
+            CompletedAt = t.Status.HasValue && t.Status == (int)Status.StatusEnum.Completed ? t.TaskActions.First().SubmittedAt : null,
+            IsRecurrent = t.IsRecurrence,
+            RecurrenceId = t.RecurrenceId,
+            TaskName = t.FkTask != null ? t.FkTask.Name : null!,
+            SubTaskName = t.FkSubtask != null ? t.FkSubtask.Name : null!,
+            TaskActionId = t.Status.HasValue && t.Status == (int)Status.StatusEnum.Completed ? t.TaskActions.First().Id : null,
+        }).ToListAsync();
+
+        return taskAssignDtos;
+    }
+
 }

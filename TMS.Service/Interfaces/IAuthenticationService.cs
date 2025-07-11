@@ -13,7 +13,7 @@ public interface IAuthenticationService
     public Task<(string,int)>  ForgotPassword(string email);
     public Task<bool> SendOtp(string email);
     public Task<(bool,string)> VerifyOtp(OtpModel model);
-    public Task<(string?,string?)> Setup2FA(SetupAuthDto dto);
+    public Task<string?> Setup2FA(SetupAuthDto dto);
     public Task<bool> Enable2Fa(Enable2FaDto dto);
     public Task<bool> Login2Fa(OtpModel dto);
 }

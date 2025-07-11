@@ -31,6 +31,7 @@ builder.Services.AddDbContext<TmsContext>(options => options.UseNpgsql(builder.C
 
 // builder.Services.AddAutoMapper(typeof(MappingConfig).Assembly);
 
+builder.Services.AddControllersWithViews();
 builder.Services.AddControllers();
 
 builder.Services.AddHangfire(x =>
@@ -49,6 +50,7 @@ builder.Services.AddScoped<ITaskActionService, TaskActionService>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<ITaskReminderService, TaskReminderService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
+builder.Services.AddScoped<IPdfService, PdfService>();
 builder.Services.AddHttpClient<HolidayService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();

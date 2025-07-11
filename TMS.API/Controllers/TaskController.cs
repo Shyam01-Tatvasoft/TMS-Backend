@@ -18,12 +18,13 @@ public class TaskController : ControllerBase
     private readonly APIResponse _response;
     private readonly IJWTService _jwtService;
     private readonly ILogService _logService;
-
-    public TaskController(ITaskService taskService, IJWTService jwtService, ILogService logService)
+    private readonly IPdfService _pdfService;
+    public TaskController(ITaskService taskService, IJWTService jwtService, ILogService logService, IPdfService pdfService)
     {
         _taskService = taskService;
         _jwtService = jwtService;
         _logService = logService;
+        _pdfService = pdfService;
         _response = new APIResponse();
     }
 
@@ -429,5 +430,23 @@ public class TaskController : ControllerBase
             await _logService.LogAsync("Get status chart analysis.", id, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(filter));
             return StatusCode(500);
         }
+    }
+
+    [HttpPost("export-pdf")]
+    public async Task<IActionResult> ExportPdf([FromBody] TaskFilterDto filters)
+    {
+
+        try
+        {
+            var pdfBytes = await _pdfService.GenerateTaskReportPdfAsync(filters);
+            return File(pdfBytes, "application/pdf", "TMS_Task_Report.pdf");
+
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Export Pdf.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(filters));
+            return StatusCode(500);
+        }
+
     }
 }

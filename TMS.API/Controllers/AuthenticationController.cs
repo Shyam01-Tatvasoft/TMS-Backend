@@ -307,11 +307,11 @@ public class AuthenticationController : ControllerBase
         var (email, role, userId) = _jwtService.ValidateToken(authToken);
         try
         {
-            var (qrImage, secret) = await _autService.Setup2FA(dto);
+            var qrImage = await _autService.Setup2FA(dto);
             await _logService.LogAsync("Setup 2FA using External Authenticator App.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             if (dto.AuthType == 3 && qrImage != null)
             {
-                return Ok(new { qrImage, secret });
+                return Ok(new {qrImage});
             }
             else if (dto.AuthType == 2)
             {
@@ -377,7 +377,7 @@ public class AuthenticationController : ControllerBase
             }
             else
             {
-                return BadRequest("In Valid Code.");
+                return BadRequest("Invalid authenticator code.");
             }
         }
         catch (System.Exception ex)
