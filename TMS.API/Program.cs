@@ -171,6 +171,7 @@ using (var scope = app.Services.CreateScope())
 {
     var jobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
     var reminderService = scope.ServiceProvider.GetRequiredService<ITaskReminderService>();
+    var authService = scope.ServiceProvider.GetRequiredService<IAuthenticationService>();
     
     jobManager.AddOrUpdate(
         "daily-task-reminder",
@@ -188,6 +189,12 @@ using (var scope = app.Services.CreateScope())
         "recurrent-task-job",
         () => reminderService.RecurrentTaskAssignmentService(),
         "30 9 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
+
+    jobManager.AddOrUpdate(
+        "unblock-user",
+        () => authService.UnblockUser(),
+        "*/1 * * * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
 }
 

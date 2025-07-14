@@ -35,6 +35,10 @@ public partial class User
 
     public int? AuthType { get; set; }
 
+    public bool? IsBlocked { get; set; }
+
+    public DateTime? BlockedAt { get; set; }
+
     public virtual Country? FkCountry { get; set; }
 
     public virtual CountryTimezone? FkCountryTimezoneNavigation { get; set; }

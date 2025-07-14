@@ -3,6 +3,8 @@
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <PreserveCompilationContext>true</PreserveCompilationContext>
+    <CopyRazorGenerateFilesToPublishDirectory>true</CopyRazorGenerateFilesToPublishDirectory>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Hangfire.PostgreSql" Version="1.8.2" />

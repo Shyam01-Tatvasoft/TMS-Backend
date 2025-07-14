@@ -1,57 +1,44 @@
-@model List<TaskAssignDto>
+@model List<TMS.Repository.Dtos.TaskAssignDto>
 
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8" />
     <style>
         body {
             font-family: Arial, sans-serif;
             font-size: 12px;
-            padding: 20px;
-        }
-        .header {
-            text-align: center;
-    using TMS.Repository.Dtos;
-#line default
-e default
-e default
-    }
-        .header img {
-            height: 50px;
-        }
-        .header h2 {
-            margin: 10px 0 0 0;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed;
         }
         th, td {
-            border: 1px solid #000;
+            border: 1px solid black;
             padding: 6px;
-            word-wrap: break-word;
-            text-align: center;
         }
         th {
             background-color: #f1f1f1;
         }
+        td{
+            text-align: center;
+        }
+        .heading{
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2>TMS - Task Management System</h2>
-    </div>
-
+    <h2 class="heading"> TMS - Task Management System</h2>
     <table>
         <thead>
             <tr>
                 <th>User Name</th>
                 <th>Task Name</th>
-                <th>Sub Task</th>
                 <th>Status</th>
                 <th>Priority</th>
-                <th>DueDate</th>
+                <th>Assigned At</th>
+                <th>Due Date</th>
             </tr>
         </thead>
         <tbody>
@@ -60,9 +47,9 @@ e default
                 <tr>
                     <td>@task.UserName</td>
                     <td>@task.TaskName</td>
-                    <td>@task.SubTaskName</td>
                     <td>@task.Status</td>
                     <td>@task.Priority</td>
+                    <td>@(task.CreatedAt.HasValue ? task.CreatedAt.Value.ToString("yyyy-MM-dd") : "N/A")</td>
                     <td>@task.DueDate.ToString("yyyy-MM-dd")</td>
                 </tr>
             }

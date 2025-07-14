@@ -482,6 +482,9 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.AuthType)
                 .HasDefaultValueSql("1")
                 .HasColumnName("auth_type");
+            entity.Property(e => e.BlockedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("blocked_at");
             entity.Property(e => e.Email)
                 .HasMaxLength(200)
                 .HasColumnName("email");
@@ -491,6 +494,9 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.FkCountryId).HasColumnName("fk_country_id");
             entity.Property(e => e.FkCountryTimezone).HasColumnName("fk_country_timezone");
             entity.Property(e => e.FkRoleId).HasColumnName("fk_role_id");
+            entity.Property(e => e.IsBlocked)
+                .HasDefaultValueSql("false")
+                .HasColumnName("is_blocked");
             entity.Property(e => e.IsDeleted)
                 .HasDefaultValueSql("false")
                 .HasColumnName("is_deleted");

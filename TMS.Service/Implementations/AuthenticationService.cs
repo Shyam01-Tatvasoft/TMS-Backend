@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Net;
 using System.Net.Mail;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using AutoMapper;
@@ -98,10 +99,10 @@ public class AuthenticationService : IAuthenticationService
             return null!;
     }
 
-    public async Task<UserDto?> LoginAsync(UserLoginDto dto)
+    public async Task<(bool, string, UserDto?)> LoginAsync(UserLoginDto dto)
     {
         var user = await _userRepository.GetByEmailAsync(dto.Email);
-        if (user == null || !VerifyPassword(dto.Password, user.Password)) return null;
+        if (user == null || !VerifyPassword(dto.Password, user.Password)) return (false, "Invalid credentials.", null);
         UserDto userData = new()
         {
             Id = user.Id,
@@ -122,8 +123,25 @@ public class AuthenticationService : IAuthenticationService
         if (user.IsTwoFaEnabled == true && user.AuthType == (int)AuthType.AuthTypeEnum.Email)
         {
             await SendOtp(dto.Email);
+            return (true, "2FA is enabled.", userData);
         }
-        return userData;
+
+        if (user.IsBlocked == true)
+        {
+            return (false, "Your account is blocked please try again latter.", null);
+        }
+        return (true, "User Logged in successfully.", userData);
+    }
+
+    public async Task<bool> BlockUserAccount(string email)
+    {
+        var user = await _userRepository.GetByEmailAsync(email);
+        if(user == null)
+            return false;
+        user.IsBlocked = true;
+        user.BlockedAt = DateTime.Now;
+
+        return await _userRepository.UpdateUserAsync(user);
     }
 
     public async Task<bool> SendOtp(string email)
@@ -326,5 +344,25 @@ public class AuthenticationService : IAuthenticationService
         }
 
         return email;
+    }
+
+    public async System.Threading.Tasks.Task UnblockUser()
+    {
+        List<User> users = await _userRepository.GetUsers();
+
+        foreach(var user in users)
+        {
+            if(user.IsBlocked == true)
+            {
+                DateTime currentTime = DateTime.Now;
+                
+                if (currentTime.Subtract(user.BlockedAt!.Value).TotalMinutes >= 30  )
+                {
+                    user.IsBlocked = false;
+                    user.BlockedAt = null;
+                    await _userRepository.UpdateUserAsync(user);
+                }
+            }
+        }
     }
 }

@@ -36,49 +36,39 @@ public class AuthenticationController : ControllerBase
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<APIResponse>> Login([FromBody] UserLoginDto dto)
+    public async Task<IActionResult> Login([FromBody] UserLoginDto dto)
     {
         if (!ModelState.IsValid)
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-            return BadRequest(_response);
+            return BadRequest(ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList());
         }
         try
         {
-            UserDto? user = await _autService.LoginAsync(dto);
-            if (user == null)
+            var (success, message, user) = await _autService.LoginAsync(dto);
+            if (success == false && user == null)
             {
-                _response.IsSuccess = false;
-                _response.ErrorMessage = new List<string> { "Invalid Credentials" };
-                return Ok(_response);
+                return BadRequest(new { isSuccess = success, message = message });
             }
-            if (user.IsTwoFaEnabled == true)
+            if (user?.IsTwoFaEnabled == true)
             {
-                _response.StatusCode = System.Net.HttpStatusCode.OK;
-                _response.IsSuccess = true;
-                _response.Result = new { token = "", loginUser = user };
-                await _logService.LogAsync("User logged in.", user.Id, Repository.Enums.Log.LogEnum.Login.ToString(), string.Empty, dto.Email);
-                return Ok(_response);
+                await _logService.LogAsync("User logged in with 2FA.", user.Id, Repository.Enums.Log.LogEnum.Login.ToString(), string.Empty, dto.Email);
+                return Ok(new { isSuccess = success, token = "", loginUser = user });
             }
-            string token = await _jwtService.GenerateToken(user.Email.ToString(), dto.RememberMe);
+            string token = await _jwtService.GenerateToken(user?.Email.ToString()!, dto.RememberMe);
 
             using (var client = new HttpClient())
             {
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             }
-            _response.StatusCode = System.Net.HttpStatusCode.OK;
-            _response.IsSuccess = true;
-            _response.Result = new { token, loginUser = user };
+
             await _logService.LogAsync("User logged in.", user.Id, Repository.Enums.Log.LogEnum.Login.ToString(), string.Empty, dto.Email);
-            return Ok(_response);
+            return Ok(new { isSuccess = success, token, loginUser = user });
         }
         catch (System.Exception ex)
         {
             await _logService.LogAsync("Login failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, dto.Email);
             throw;
         }
-
     }
 
 
@@ -311,7 +301,11 @@ public class AuthenticationController : ControllerBase
             await _logService.LogAsync("Setup 2FA using External Authenticator App.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(dto));
             if (dto.AuthType == 3 && qrImage != null)
             {
-                return Ok(new {qrImage});
+                return Ok(new { qrImage });
+            }
+            else if (dto.IsEnabled == false)
+            {
+                return Ok();
             }
             else if (dto.AuthType == 2)
             {
@@ -344,7 +338,7 @@ public class AuthenticationController : ControllerBase
         try
         {
             bool isEnabled = await _autService.Enable2Fa(dto);
-            if(!isEnabled)
+            if (!isEnabled)
             {
                 await _logService.LogAsync("Enable 2FA using External Authenticator App.", int.Parse(userId!), Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(dto));
                 return BadRequest("In Valid Code please try again.");
@@ -383,6 +377,28 @@ public class AuthenticationController : ControllerBase
         catch (System.Exception ex)
         {
             await _logService.LogAsync("Login 2FA Authenticator App.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(dto));
+            return StatusCode(500);
+        }
+    }
+
+    [HttpPost("block-user")]
+    [AllowAnonymous]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> BlockAccount([FromBody] string email)
+    {
+        try
+        {
+            bool result = await _autService.BlockUserAccount(email);
+            if (!result)
+                return BadRequest();
+            await _logService.LogAsync("Block user account.", 0, Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(email));
+            return Ok(new { message = "user account is blocked." });
+        }
+        catch (System.Exception)
+        {
+            await _logService.LogAsync("Block user account.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), string.Empty, JsonSerializer.Serialize(email));
             return StatusCode(500);
         }
     }

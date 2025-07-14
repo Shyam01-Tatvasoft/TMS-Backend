@@ -433,12 +433,26 @@ public class TaskController : ControllerBase
     }
 
     [HttpPost("export-pdf")]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
     public async Task<IActionResult> ExportPdf([FromBody] TaskFilterDto filters)
     {
-
+        string authToken = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        if (string.IsNullOrEmpty(authToken))
+        {
+            return Unauthorized();
+        }
+        var (email, role, userId) = _jwtService.ValidateToken(authToken);
+        int id = int.Parse(userId!);
+        if (email == null || role == null || userId == null)
+            return Unauthorized();
         try
         {
-            var pdfBytes = await _pdfService.GenerateTaskReportPdfAsync(filters);
+            var pdfBytes = await _pdfService.GenerateTaskReportPdfAsync(filters, role, id);
+            if(pdfBytes == null)
+            {
+                return BadRequest();
+            }
             return File(pdfBytes, "application/pdf", "TMS_Task_Report.pdf");
 
         }
