@@ -49,6 +49,8 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<SubTask> SubTasks { get; set; }
 
+    public virtual DbSet<SystemConfiguration> SystemConfigurations { get; set; }
+
     public virtual DbSet<Task> Tasks { get; set; }
 
     public virtual DbSet<TaskAction> TaskActions { get; set; }
@@ -376,6 +378,26 @@ public partial class TmsContext : DbContext
             entity.HasOne(d => d.FkTask).WithMany(p => p.SubTasks)
                 .HasForeignKey(d => d.FkTaskId)
                 .HasConstraintName("sub_task_fk_task_id_fkey");
+        });
+
+        modelBuilder.Entity<SystemConfiguration>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("system_configuratiions_pkey");
+
+            entity.ToTable("system_configurations");
+
+            entity.HasIndex(e => e.ConfigName, "unique_config_name").IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("nextval('system_configuratiions_id_seq'::regclass)")
+                .HasColumnName("id");
+            entity.Property(e => e.ConfigName)
+                .HasMaxLength(100)
+                .HasColumnName("config_name");
+            entity.Property(e => e.ConfigValue).HasColumnName("config_value");
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updated_at");
         });
 
         modelBuilder.Entity<Task>(entity =>

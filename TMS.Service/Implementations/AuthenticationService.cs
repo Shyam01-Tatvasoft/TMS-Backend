@@ -165,17 +165,33 @@ public class AuthenticationService : IAuthenticationService
         return true;
     }
 
-    public async Task<(bool, string)> VerifyOtp(OtpModel model)
+    public async Task<(bool, string, UserDto?)> VerifyOtp(OtpModel model)
     {
         var record = await _userOtpRepository.GetAsync(model.Email);
+        User? user = await _userRepository.GetByEmailAsync(model.Email);
 
         if (record == null || record.ExpiryTime < DateTime.UtcNow)
-            return (false, "OTP expired or not found.");
+            return (false, "OTP expired or not found.", null);
 
         if (!HashHelper.VerifyHash(model.OTP, record.OtpHash))
-            return (false, "Invalid OTP.");
-
-        return (true, "OTP is valid.");
+            return (false, "Invalid OTP.", null);
+        UserDto userData = new()
+        {
+            Id = user.Id,
+            Email = user.Email,
+            Username = user.Username,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
+            Phone = user.Phone,
+            Role = user.FkRole.Name,
+            CountryName = user.FkCountry?.Name,
+            TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
+            IsTwoFaEnabled = user.IsTwoFaEnabled,
+            AuthType = user.AuthType
+        };
+        return (true, "OTP is valid.", userData);
     }
 
     public async Task<string?> Setup2FA(SetupAuthDto dto)
@@ -223,12 +239,28 @@ public class AuthenticationService : IAuthenticationService
         return true;
     }
 
-    public async Task<bool> Login2Fa(OtpModel dto)
+    public async Task<UserDto?> Login2Fa(OtpModel dto)
     {
         User? user = await _userRepository.GetByEmailAsync(dto.Email);
         if (user == null || user.Email == null || !_otpService.Validate(user.Email, dto.OTP))
-            return false;
-        return true;
+            return null;
+        UserDto userData = new()
+        {
+            Id = user.Id,
+            Email = user.Email,
+            Username = user.Username,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
+            Phone = user.Phone,
+            Role = user.FkRole.Name,
+            CountryName = user.FkCountry?.Name,
+            TimezoneName = user.FkCountryTimezoneNavigation.Timezone,
+            IsTwoFaEnabled = user.IsTwoFaEnabled,
+            AuthType = user.AuthType
+        };
+        return userData;
     }
 
     private static string HashPassword(string password)

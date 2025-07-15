@@ -264,13 +264,13 @@ public class AuthenticationController : ControllerBase
     {
         try
         {
-            var (success, message) = await _autService.VerifyOtp(model);
+            var (success, message, user) = await _autService.VerifyOtp(model);
 
             if (success)
             {
                 string token = await _jwtService.GenerateToken(model.Email.ToString(), true);
                 await _logService.LogAsync("Verify OTP.", 0, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, JsonSerializer.Serialize(model));
-                return Ok(token);
+                return Ok(new { token, loginUser = user });
             }
             else
             {
@@ -362,12 +362,12 @@ public class AuthenticationController : ControllerBase
     {
         try
         {
-            bool result = await _autService.Login2Fa(dto);
-            if (result)
+            UserDto? result = await _autService.Login2Fa(dto);
+            if (result != null)
             {
                 string token = await _jwtService.GenerateToken(dto.Email.ToString(), true);
                 await _logService.LogAsync("Login 2FA Authenticator App.", 0, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, JsonSerializer.Serialize(dto));
-                return Ok(token);
+                return Ok(new { token, loginUser = result });
             }
             else
             {

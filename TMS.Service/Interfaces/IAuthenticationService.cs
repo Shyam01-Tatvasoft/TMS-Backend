@@ -12,10 +12,10 @@ public interface IAuthenticationService
     public Task<User> ResetPasswordAsync(string email, ResetPasswordDto dto);
     public Task<(string, int)> ForgotPassword(string email);
     public Task<bool> SendOtp(string email);
-    public Task<(bool, string)> VerifyOtp(OtpModel model);
+    public Task<(bool, string, UserDto?)> VerifyOtp(OtpModel model);
     public Task<string?> Setup2FA(SetupAuthDto dto);
     public Task<bool> Enable2Fa(Enable2FaDto dto);
-    public Task<bool> Login2Fa(OtpModel dto);
+    public Task<UserDto?> Login2Fa(OtpModel dto);
     public Task<bool> BlockUserAccount(string email);
     public System.Threading.Tasks.Task UnblockUser();
 }

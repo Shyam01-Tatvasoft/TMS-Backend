@@ -60,10 +60,12 @@ public class LogService : ILogService
 
         return newLog;
     }
-    private JsonElement? TryDeserializeJsonElement(string data)
+    private JsonElement? TryDeserializeJsonElement(string? data)
     {
         try
         {
+            if(string.IsNullOrEmpty(data))
+                return null;
             // Check if the string starts with '{' or '[' indicating JSON object/array
             if (data.TrimStart().StartsWith("{") || data.TrimStart().StartsWith("["))
             {
@@ -77,7 +79,6 @@ public class LogService : ILogService
         }
         catch (JsonException)
         {
-            // If deserialization fails, return an empty JsonElement or handle error as needed
             return null;
         }
     }
