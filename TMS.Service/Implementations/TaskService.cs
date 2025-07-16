@@ -138,7 +138,7 @@ public class TaskService : ITaskService
                 await _taskAssignRepository.AddTaskAssignAsync(newTask);
                 await _notificationService.AddNotification((int)task.FkUserId, newTask.Id, (int)Repository.Enums.Notification.NotificationEnum.Assigned);
                 string emailBody = await GetTaskEmailBody(newTask.Id);
-                _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
+                await _emailService.SendMail(newTask?.FkUser?.Email!, "New Task Assigned", emailBody);
                 await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, "New Task Assigned!");
                 transaction.Complete();
                 return (newTask!.Id, "Task assigned successfully.");
@@ -496,7 +496,7 @@ public class TaskService : ITaskService
             await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Approved);
 
             string emailBody = await GetTaskEmailBody(taskAssign.Id);
-            _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Approved", emailBody);
+            await _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Approved", emailBody);
 
             await _hubContext.Clients.All.SendAsync("ReceiveNotification", (int)taskAssign.FkUserId!, "Your Task is Approved !");
 
@@ -528,7 +528,7 @@ public class TaskService : ITaskService
 
             // Reassign task email
             string emailBody = await GetTaskEmailBody(taskAssign.Id, "TaskReassignedTemplate");
-            _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Reassigned", emailBody);
+            await _emailService.SendMail(taskAssign.FkUser?.Email!, "Task Reassigned", emailBody);
 
             // Notify user
             await _notificationService.AddNotification((int)taskAssign.FkUserId!, taskAssign.Id, (int)Repository.Enums.Notification.NotificationEnum.Reassigned);

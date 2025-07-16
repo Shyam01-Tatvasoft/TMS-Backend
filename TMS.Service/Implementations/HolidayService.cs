@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.WebUtilities;
+using TMS.Repository.Interfaces;
+using TMS.Service.Constants;
 using TMS.Service.Interfaces;
 
 namespace TMS.Service.Implementations;
@@ -7,17 +9,19 @@ namespace TMS.Service.Implementations;
 public class HolidayService : IHolidayService
 {
     private readonly HttpClient _httpClient;
-
-    public HolidayService(HttpClient httpClient)
+    private readonly ISystemConfigurationRepository _systemConfigurationRepository;
+    public HolidayService(HttpClient httpClient,ISystemConfigurationRepository systemConfigurationRepository)
     {
         _httpClient = httpClient;
+        _systemConfigurationRepository = systemConfigurationRepository;
     }
 
     public async Task<bool> IsHolidayAsync(string countryCode, DateTime date)
     {
         if (string.IsNullOrEmpty(countryCode)) return false;
         string year = date.Year.ToString();
-        string url = $"https://date.nager.at/api/v3/PublicHolidays/{year}/{countryCode}";
+        string holidayUrl = (await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.HolidayApi))!;
+        string url = holidayUrl + year + "/" + countryCode;
 
         try
         {

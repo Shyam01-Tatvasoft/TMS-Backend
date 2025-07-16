@@ -35,7 +35,7 @@ public class TaskReminderService : ITaskReminderService
 
                 await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, message);
                 string emailBodyAdmin = await GetTaskEmailBody(task.Id, "ReminderMail");
-                _emailService.SendMail(task?.FkUser?.Email!, "Task DueDate Reminder", emailBodyAdmin);
+                await _emailService.SendMail(task?.FkUser?.Email!, "Task DueDate Reminder", emailBodyAdmin);
                 
             }
         }
@@ -54,7 +54,7 @@ public class TaskReminderService : ITaskReminderService
 
                 await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, message);
                 string emailBodyAdmin = await GetTaskEmailBody(task.Id, "OverdueMail");
-                _emailService.SendMail(task?.FkUser?.Email!, "Task Overdue Reminder", emailBodyAdmin);
+                await _emailService.SendMail(task?.FkUser?.Email!, "Task Overdue Reminder", emailBodyAdmin);
             }
         }
     }
@@ -72,7 +72,7 @@ public class TaskReminderService : ITaskReminderService
 
                 await _hubContext.Clients.All.SendAsync("ReceiveNotification", task.FkUserId, message);
                 string emailBodyAdmin = await GetTaskEmailBody(task.Id, "TaskEmailTemplate");
-                _emailService.SendMail(task?.FkUser?.Email!, "New Task Assigned", emailBodyAdmin);
+                await _emailService.SendMail(task?.FkUser?.Email!, "New Task Assigned", emailBodyAdmin);
             }
         }
     }

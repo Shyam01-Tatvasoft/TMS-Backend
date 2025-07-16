@@ -6,13 +6,13 @@ using TMS.Repository.Interfaces;
 
 namespace TMS.Repository.Implementations;
 
-public class SystemConfigurationRepository: ISystemConfigurationRepository
+public class SystemConfigurationRepository : ISystemConfigurationRepository
 {
     private readonly TmsContext _context;
     private readonly IMemoryCache _cache;
     private readonly IConfiguration _configuration;
     private const string ConfigCacheKey = "SystemConfigurations";
-    
+
     public SystemConfigurationRepository(TmsContext context, IMemoryCache cache, IConfiguration configuration)
     {
         _context = context;
@@ -30,13 +30,14 @@ public class SystemConfigurationRepository: ISystemConfigurationRepository
         return configs!;
     }
 
-    public async Task<string?> GetValueAsync(string key)
+    public async Task<string?> GetConfigByNameAsync(string configName)
     {
-        var configs = await GetAllConfigsAsync();
-        var config = configs.FirstOrDefault(x => x.ConfigName == key);
-
-        if (config == null) return null;
-        return config.ConfigValue;
+        if (!_cache.TryGetValue(ConfigCacheKey, out List<SystemConfiguration>? configs))
+        {
+            configs = await _context.SystemConfigurations.ToListAsync();
+            _cache.Set(ConfigCacheKey, configs, TimeSpan.FromMinutes(30));
+        }
+        return configs?.FirstOrDefault(c => c.ConfigName == configName)?.ConfigValue;
     }
 
     public async System.Threading.Tasks.Task RefreshCacheAsync()
@@ -45,4 +46,16 @@ public class SystemConfigurationRepository: ISystemConfigurationRepository
         _cache.Set(ConfigCacheKey, configs, TimeSpan.FromMinutes(30));
     }
 
+    public async Task<bool> AddSystemConfig(SystemConfiguration newConfig)
+    {
+        await _context.AddAsync(newConfig);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async System.Threading.Tasks.Task UpdateSystemConfig(SystemConfiguration updatedConfig)
+    {
+        _context.Update(updatedConfig);
+        await _context.SaveChangesAsync();
+    }
 }

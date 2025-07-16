@@ -83,7 +83,7 @@ public class TaskActionService : ITaskActionService
 
             // perform email send task
             string emailBody = await GetTaskEmailBody("WelcomeMailTemplate");
-            _emailService.SendMail(emailTask.Email, emailTask.Subject, emailBody);
+            await _emailService.SendMail(emailTask.Email, emailTask.Subject, emailBody);
             if (emailTask.TaskActionId != null && emailTask.TaskActionId != 0)
             {
                 // Perform update when Task is reassigned
@@ -103,7 +103,7 @@ public class TaskActionService : ITaskActionService
 
             // send mail to admin
             string emailBodyAdmin = await GetTaskEmailBody(emailTask.FkTaskId, "TaskPerformedTemplate");
-            _emailService.SendMail("admin1@gmail.com", "Task Performed", emailBodyAdmin);
+            await _emailService.SendMail("admin1@gmail.com", "Task Performed", emailBodyAdmin);
 
             //send notification to admin
             await _notificationService.AddNotification(1, emailTask.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
@@ -198,7 +198,7 @@ public class TaskActionService : ITaskActionService
 
             // Send notifications
             string emailBodyAdmin = await GetTaskEmailBody(dto.FkTaskId, "TaskPerformedTemplate");
-            _emailService.SendMail("admin1@gmail.com", "Task Performed", emailBodyAdmin);
+            await _emailService.SendMail("admin1@gmail.com", "Task Performed", emailBodyAdmin);
             await _notificationService.AddNotification(1, dto.FkTaskId, (int)Repository.Enums.Notification.NotificationEnum.Review);
             await _hubContext.Clients.All.SendAsync("ReceiveNotification", "1", "User Performed an action.");
             transaction.Complete();

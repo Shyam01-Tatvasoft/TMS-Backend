@@ -7,7 +7,7 @@ public interface IAuthenticationService
 {
     public Task<(string, int)> RegisterAsync(UserRegisterDto dto);
     public Task<(bool, string, UserDto?)> LoginAsync(UserLoginDto dto);
-    public string GenerateResetToken(string email);
+    public Task<string> GenerateResetToken(string email);
     public Task<string?> ValidateResetToken(string token, string validationType);
     public Task<User> ResetPasswordAsync(string email, ResetPasswordDto dto);
     public Task<(string, int)> ForgotPassword(string email);

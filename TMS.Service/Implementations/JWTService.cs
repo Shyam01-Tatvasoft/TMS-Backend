@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using TMS.Repository.Data;
 using TMS.Repository.Interfaces;
+using TMS.Service.Constants;
 using TMS.Service.Interfaces;
 
 namespace TMS.Service.Implementations;
@@ -16,9 +17,10 @@ public class JWTService:IJWTService
     private readonly string _key;
     private readonly string _issuer;
     private readonly string _audience;
-
-    public JWTService(IConfiguration config,IUserRepository userRepository)
+    private readonly ISystemConfigurationRepository _systemConfigurationRepository;
+    public JWTService(IConfiguration config,IUserRepository userRepository,ISystemConfigurationRepository systemConfigurationRepository)
     {
+        _systemConfigurationRepository = systemConfigurationRepository;
         _key = config["Jwt:Key"]!;
         _issuer = config["Jwt:Issuer"]!;
         _audience = config["Jwt:Audience"]!;
@@ -28,7 +30,7 @@ public class JWTService:IJWTService
 
     public async Task<string> GenerateToken(string email, bool rememberMe)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_key));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes((await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.JwtSecret))!));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         User? user = await _userRepository.GetByEmailAsync(email);
         string? userRole = user?.FkRoleId == 1 ? "Admin" : "User";
@@ -38,10 +40,12 @@ public class JWTService:IJWTService
             new Claim(ClaimTypes.Role, userRole),
             new Claim(ClaimTypes.NameIdentifier,user.Id.ToString())
          };
-        DateTime expiry = rememberMe ? DateTime.UtcNow.AddHours(24) : DateTime.UtcNow.AddHours(3);
+        int tokenExpiry = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.JWTExpiry) ?? "");
+        int tokenExpiryLong = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.JWTExpiryLong) ?? "");
+        DateTime expiry = rememberMe ? DateTime.UtcNow.AddHours(tokenExpiryLong) : DateTime.UtcNow.AddHours(tokenExpiry);
         var token = new JwtSecurityToken(
-            issuer: _issuer,
-            audience: _audience,
+            issuer: (await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.JWTIssuer))!,
+            audience: (await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.JWTAudience))!,
             claims: authClaims,
             expires: expiry,
             signingCredentials: credentials

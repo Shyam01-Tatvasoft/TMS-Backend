@@ -1,17 +1,28 @@
 using System.Net;
 using System.Net.Mail;
+using TMS.Repository.Data;
+using TMS.Repository.Interfaces;
+using TMS.Service.Constants;
 using TMS.Service.Interfaces;
 
 namespace TMS.Service.Implementations;
 
 public class EmailService : IEmailService
 {
-  public int SendMail(string ToEmail, string subject, string body)
+
+  private readonly ISystemConfigurationRepository _systemConfigurationRepository;
+
+  public EmailService(ISystemConfigurationRepository systemConfigurationRepository)
   {
-    string SenderMail = "test.dotnet@etatvasoft.com";
-    string SenderPassword = "P}N^{z-]7Ilp";
-    string Host = "mail.etatvasoft.com";
-    int Port = 587;
+    _systemConfigurationRepository = systemConfigurationRepository;
+  }
+
+  public async Task<int> SendMail(string ToEmail, string subject, string body)
+  {
+    string SenderMail = (await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.SenderEmail))!;
+    string SenderPassword = (await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.SenderPassword))!;
+    string Host = (await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.EmailHost))!;
+    int Port = int.Parse((await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.Port))!);
 
     var smtpClient = new SmtpClient(Host)
     {

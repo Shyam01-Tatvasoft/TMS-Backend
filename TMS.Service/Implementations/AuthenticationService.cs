@@ -10,6 +10,7 @@ using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Repository.Enums;
 using TMS.Repository.Interfaces;
+using TMS.Service.Constants;
 using TMS.Service.Helpers;
 using TMS.Service.Interfaces;
 
@@ -22,13 +23,15 @@ public class AuthenticationService : IAuthenticationService
     private readonly IEmailService _emailService;
     private readonly IOtpService _otpService;
     private readonly IDataProtector _dataProtector;
-    public AuthenticationService(IUserRepository userRepository, IDataProtectionProvider dataProtectionProvider, IUserOtpRepository userOtpRepository, IEmailService emailService, IOtpService otpService)
+    private readonly ISystemConfigurationRepository _systemConfigurationRepository;
+    public AuthenticationService(IUserRepository userRepository, IDataProtectionProvider dataProtectionProvider, IUserOtpRepository userOtpRepository, IEmailService emailService, IOtpService otpService, ISystemConfigurationRepository systemConfigurationRepository)
     {
         _userRepository = userRepository;
         _dataProtector = dataProtectionProvider.CreateProtector("ResetPasswordProtector");
         _userOtpRepository = userOtpRepository;
         _emailService = emailService;
         _otpService = otpService;
+        _systemConfigurationRepository = systemConfigurationRepository;
     }
 
     public async Task<(string, int)> RegisterAsync(UserRegisterDto dto)
@@ -53,7 +56,7 @@ public class AuthenticationService : IAuthenticationService
         };
 
         await _userRepository.AddAsync(user);
-        string resetToken = GenerateResetToken(dto.Email);
+        string resetToken = await GenerateResetToken(dto.Email);
         var resetLink = "http://127.0.0.1:5500/assets/templates/SetupPassword.html?token=" + resetToken;
         string subject = "Password setup request";
         string body = GetEmailTemplate(resetLink, "SetupPasswordTemplate");
@@ -66,7 +69,7 @@ public class AuthenticationService : IAuthenticationService
         var existing = await _userRepository.GetByEmailAsync(email);
         if (existing == null) return ("User not Exist.", 0);
 
-        string resetToken = GenerateResetToken(email);
+        string resetToken = await GenerateResetToken(email);
         var resetLink = "http://127.0.0.1:5500/assets/templates/ResetPassword.html?token=" + resetToken;
         string subject = "Password reset request";
         string body = GetEmailTemplate(resetLink, "ForgotPasswordTemplate");
@@ -136,7 +139,7 @@ public class AuthenticationService : IAuthenticationService
     public async Task<bool> BlockUserAccount(string email)
     {
         var user = await _userRepository.GetByEmailAsync(email);
-        if(user == null)
+        if (user == null)
             return false;
         user.IsBlocked = true;
         user.BlockedAt = DateTime.Now;
@@ -160,7 +163,7 @@ public class AuthenticationService : IAuthenticationService
         if (id <= 0)
             return false;
 
-        _emailService.SendMail(email, "Verify your otp", $"Your OTP is: {otp}");
+        await _emailService.SendMail(email, "Verify your otp", $"Your OTP is: {otp}");
 
         return true;
     }
@@ -318,9 +321,10 @@ public class AuthenticationService : IAuthenticationService
         smtpClient.Send(mailMessage);
     }
 
-    public string GenerateResetToken(string email)
-    {
-        DateTime expiry = DateTime.UtcNow.AddHours(24);
+    public async Task<string> GenerateResetToken(string email)
+    {   
+        int ResetPasswordLinkExpiry = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.ResetPasswordLinkExpiry) ?? "24");
+        DateTime expiry = DateTime.UtcNow.AddHours(ResetPasswordLinkExpiry);
         string tokenData = $"{email} | {expiry.Ticks}";
         return _dataProtector.Protect(tokenData);
     }
@@ -382,13 +386,13 @@ public class AuthenticationService : IAuthenticationService
     {
         List<User> users = await _userRepository.GetUsers();
 
-        foreach(var user in users)
+        foreach (var user in users)
         {
-            if(user.IsBlocked == true)
+            if (user.IsBlocked == true)
             {
                 DateTime currentTime = DateTime.Now;
-                
-                if (currentTime.Subtract(user.BlockedAt!.Value).TotalMinutes >= 30  )
+                int LockupDuration = int.Parse((await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.LockupDuration))!);
+                if (currentTime.Subtract(user.BlockedAt!.Value).TotalMinutes >= LockupDuration)
                 {
                     user.IsBlocked = false;
                     user.BlockedAt = null;

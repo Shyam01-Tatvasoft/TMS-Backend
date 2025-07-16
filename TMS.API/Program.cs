@@ -51,6 +51,7 @@ builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<ITaskReminderService, TaskReminderService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<IPdfService, PdfService>();
+builder.Services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
 builder.Services.AddHttpClient<HolidayService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -62,6 +63,7 @@ builder.Services.AddScoped<INotificationRepository,NotificationRepository >();
 builder.Services.AddScoped<ITaskActionRepository,TaskActionRepository>();
 builder.Services.AddScoped<ILogRepository, LogRepository>();
 builder.Services.AddScoped<IUserOtpRepository, UserOtpRepository>();
+builder.Services.AddScoped<ISystemConfigurationRepository, SystemConfigurationRepository>();
 builder.Services.AddHttpClient<CountryRepository>();
 
 
