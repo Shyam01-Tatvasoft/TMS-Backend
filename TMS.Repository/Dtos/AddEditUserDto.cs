@@ -47,6 +47,7 @@ public class AddEditUserDto
     public DateTime? ModifiedAt { get; set; }
 
     public IFormFile? ProfileImage { get; set; }
+    public DateTime? PasswordExpiryDate { get; set; }
 
     public string? ProfileImagePath { get; set; }
 }

@@ -13,4 +13,6 @@ public class LoginConfigDto
     public int ResetPasswordLinkExpiry { get; set; }
     public int SetupPasswordLinkExpiry { get; set; }
     public int PasswordExpiryDuration { get; set; }
+    public string ResetPasswordUrl { get; set; } = string.Empty;
+    public string SetupPasswordUrl { get; set; } = string.Empty;
 }

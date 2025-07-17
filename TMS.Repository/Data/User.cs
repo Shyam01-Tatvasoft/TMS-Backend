@@ -39,6 +39,12 @@ public partial class User
 
     public DateTime? BlockedAt { get; set; }
 
+    public int? InvalidLoginAttempts { get; set; }
+
+    public DateTime? LastInvalidAttemptAt { get; set; }
+
+    public DateTime? PasswordExpiryDate { get; set; }
+
     public virtual Country? FkCountry { get; set; }
 
     public virtual CountryTimezone? FkCountryTimezoneNavigation { get; set; }

@@ -25,7 +25,7 @@ public class SystemConfigurationRepository : ISystemConfigurationRepository
         if (!_cache.TryGetValue(ConfigCacheKey, out List<SystemConfiguration>? configs))
         {
             configs = await _context.SystemConfigurations.ToListAsync();
-            _cache.Set(ConfigCacheKey, configs, TimeSpan.FromMinutes(30));
+            _cache.Set(ConfigCacheKey, configs);
         }
         return configs!;
     }
@@ -35,7 +35,7 @@ public class SystemConfigurationRepository : ISystemConfigurationRepository
         if (!_cache.TryGetValue(ConfigCacheKey, out List<SystemConfiguration>? configs))
         {
             configs = await _context.SystemConfigurations.ToListAsync();
-            _cache.Set(ConfigCacheKey, configs, TimeSpan.FromMinutes(30));
+            _cache.Set(ConfigCacheKey, configs);
         }
         return configs?.FirstOrDefault(c => c.ConfigName == configName)?.ConfigValue;
     }
@@ -43,7 +43,7 @@ public class SystemConfigurationRepository : ISystemConfigurationRepository
     public async System.Threading.Tasks.Task RefreshCacheAsync()
     {
         var configs = await _context.SystemConfigurations.ToListAsync();
-        _cache.Set(ConfigCacheKey, configs, TimeSpan.FromMinutes(30));
+        _cache.Set(ConfigCacheKey, configs);
     }
 
     public async Task<bool> AddSystemConfig(SystemConfiguration newConfig)

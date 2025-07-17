@@ -10,7 +10,7 @@ using TMS.Service.Interfaces;
 
 namespace TMS.Service.Implementations;
 
-public class JWTService:IJWTService
+public class JWTService : IJWTService
 {
     private readonly IUserRepository _userRepository;
     private readonly IConfiguration _config;
@@ -18,7 +18,7 @@ public class JWTService:IJWTService
     private readonly string _issuer;
     private readonly string _audience;
     private readonly ISystemConfigurationRepository _systemConfigurationRepository;
-    public JWTService(IConfiguration config,IUserRepository userRepository,ISystemConfigurationRepository systemConfigurationRepository)
+    public JWTService(IConfiguration config, IUserRepository userRepository, ISystemConfigurationRepository systemConfigurationRepository)
     {
         _systemConfigurationRepository = systemConfigurationRepository;
         _key = config["Jwt:Key"]!;
@@ -28,13 +28,13 @@ public class JWTService:IJWTService
     }
 
 
-    public async Task<string> GenerateToken(string email, bool rememberMe)
+    public async Task<(string, int)> GenerateToken(string email, bool rememberMe)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes((await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.JwtSecret))!));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         User? user = await _userRepository.GetByEmailAsync(email);
         string? userRole = user?.FkRoleId == 1 ? "Admin" : "User";
-        
+
         var authClaims = new List<Claim>{
             new Claim(ClaimTypes.Email, email),
             new Claim(ClaimTypes.Role, userRole),
@@ -50,7 +50,8 @@ public class JWTService:IJWTService
             expires: expiry,
             signingCredentials: credentials
         );
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        int expiryHours = rememberMe ? tokenExpiryLong : tokenExpiry;
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiryHours);
     }
 
     public (string?, string?, string?) ValidateToken(string token)

@@ -54,15 +54,14 @@ public class AuthenticationController : ControllerBase
                 await _logService.LogAsync("User logged in with 2FA.", user.Id, Repository.Enums.Log.LogEnum.Login.ToString(), string.Empty, dto.Email);
                 return Ok(new { isSuccess = success, token = "", loginUser = user });
             }
-            string token = await _jwtService.GenerateToken(user?.Email.ToString()!, dto.RememberMe);
-
+            var (token, expiry) = await _jwtService.GenerateToken(user?.Email.ToString()!, dto.RememberMe);
             using (var client = new HttpClient())
             {
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             }
 
             await _logService.LogAsync("User logged in.", user.Id, Repository.Enums.Log.LogEnum.Login.ToString(), string.Empty, dto.Email);
-            return Ok(new { isSuccess = success, token, loginUser = user });
+            return Ok(new { isSuccess = success, token, tokenExpiry = expiry, loginUser = user });
         }
         catch (System.Exception ex)
         {
@@ -268,9 +267,9 @@ public class AuthenticationController : ControllerBase
 
             if (success)
             {
-                string token = await _jwtService.GenerateToken(model.Email.ToString(), true);
+                var (token, expiry) = await _jwtService.GenerateToken(model.Email.ToString(), true);
                 await _logService.LogAsync("Verify OTP.", 0, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, JsonSerializer.Serialize(model));
-                return Ok(new { token, loginUser = user });
+                return Ok(new { token, tokenExpiry = expiry, loginUser = user });
             }
             else
             {
@@ -362,12 +361,16 @@ public class AuthenticationController : ControllerBase
     {
         try
         {
-            UserDto? result = await _autService.Login2Fa(dto);
-            if (result != null)
+            var (success, message, user) = await _autService.Login2Fa(dto);
+            if (success == false && user == null)
             {
-                string token = await _jwtService.GenerateToken(dto.Email.ToString(), true);
+                return BadRequest(message);
+            }
+            if (user != null)
+            {
+                var (token, expiry) = await _jwtService.GenerateToken(dto.Email.ToString(), true);
                 await _logService.LogAsync("Login 2FA Authenticator App.", 0, Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, JsonSerializer.Serialize(dto));
-                return Ok(new { token, loginUser = result });
+                return Ok(new { token, tokenExpiry = expiry, loginUser = user });
             }
             else
             {
@@ -399,6 +402,31 @@ public class AuthenticationController : ControllerBase
         catch (System.Exception)
         {
             await _logService.LogAsync("Block user account.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), string.Empty, JsonSerializer.Serialize(email));
+            return StatusCode(500);
+        }
+    }
+
+    [HttpPost("change-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto model)
+    {
+        try
+        {
+            User user = await _autService.ChangePasswordAsync(model);
+            if(user != null)
+            {
+                await _logService.LogAsync("Change password.", 0, Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(model));
+                return Ok("Password Changed Successfully !");
+            }
+            else 
+                return BadRequest("Error occurred while changing password.");
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Change password.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), ex.StackTrace, JsonSerializer.Serialize(model));
             return StatusCode(500);
         }
     }

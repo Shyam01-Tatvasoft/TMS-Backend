@@ -57,7 +57,8 @@ public class AuthenticationService : IAuthenticationService
 
         await _userRepository.AddAsync(user);
         string resetToken = await GenerateResetToken(dto.Email);
-        var resetLink = "http://127.0.0.1:5500/assets/templates/SetupPassword.html?token=" + resetToken;
+        string? setupPath = await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.SetupPasswordUrl);
+        var resetLink = setupPath + resetToken;
         string subject = "Password setup request";
         string body = GetEmailTemplate(resetLink, "SetupPasswordTemplate");
         SendMail(dto.Email, subject, body);
@@ -70,7 +71,8 @@ public class AuthenticationService : IAuthenticationService
         if (existing == null) return ("User not Exist.", 0);
 
         string resetToken = await GenerateResetToken(email);
-        var resetLink = "http://127.0.0.1:5500/assets/templates/ResetPassword.html?token=" + resetToken;
+        string? resetPath = await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.ResetPasswordUrl);
+        var resetLink = resetPath + resetToken;
         string subject = "Password reset request";
         string body = GetEmailTemplate(resetLink, "ForgotPasswordTemplate");
         SendMail(email, subject, body);
@@ -81,6 +83,7 @@ public class AuthenticationService : IAuthenticationService
     {
         User? user = await _userRepository.GetByEmailAsync(email);
         user!.Password = HashPassword(dto.NewPassword);
+        int PasswordExpiryDuration = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.PasswordExpiryDuration) ?? "60");
         AddEditUserDto userData = new()
         {
             Id = user.Id,
@@ -93,7 +96,35 @@ public class AuthenticationService : IAuthenticationService
             Phone = user.Phone,
             IsDeleted = false,
             ModifiedAt = DateTime.Now,
-            Username = user.Username
+            Username = user.Username,
+            PasswordExpiryDate = DateTime.Now.Date.AddDays(PasswordExpiryDuration)
+        };
+        bool response = await _userRepository.UpdateAsync(userData);
+        if (response)
+            return user;
+        else
+            return null!;
+    }
+
+    public async Task<User> ChangePasswordAsync(ChangePasswordDto dto)
+    {
+        User? user = await _userRepository.GetByEmailAsync(dto.Email);
+        user!.Password = HashPassword(dto.NewPassword);
+        int PasswordExpiryDuration = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.PasswordExpiryDuration) ?? "60");
+        AddEditUserDto userData = new()
+        {
+            Id = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            FkCountryId = user.FkCountryId,
+            FkCountryTimezone = user.FkCountryTimezone,
+            Password = user.Password,
+            Phone = user.Phone,
+            IsDeleted = false,
+            ModifiedAt = DateTime.Now,
+            Username = user.Username,
+            PasswordExpiryDate = DateTime.Now.Date.AddDays(PasswordExpiryDuration)
         };
         bool response = await _userRepository.UpdateAsync(userData);
         if (response)
@@ -105,7 +136,30 @@ public class AuthenticationService : IAuthenticationService
     public async Task<(bool, string, UserDto?)> LoginAsync(UserLoginDto dto)
     {
         var user = await _userRepository.GetByEmailAsync(dto.Email);
-        if (user == null || !VerifyPassword(dto.Password, user.Password)) return (false, "Invalid credentials.", null);
+        if (user == null || !VerifyPassword(dto.Password, user.Password))
+        {
+            if (user != null)
+            {
+                user.InvalidLoginAttempts += 1;
+                user.LastInvalidAttemptAt = DateTime.Now;
+                if (user.IsBlocked == true)
+                {
+                    return (false, "Your account is blocked try again later.", null);
+                }
+                int userLockout = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.UserLockup) ?? "5");
+                if (user.InvalidLoginAttempts >= userLockout)
+                {
+                    user.IsBlocked = true;
+                    user.BlockedAt = DateTime.Now;
+                    await _userRepository.UpdateUserAsync(user);
+                    return (false, "Your account has been blocked due to multiple failed attempts.", null);
+                }
+
+                await _userRepository.UpdateUserAsync(user);
+            }
+
+            return (false, "Invalid credentials.", null);
+        }
         UserDto userData = new()
         {
             Id = user.Id,
@@ -123,16 +177,22 @@ public class AuthenticationService : IAuthenticationService
             AuthType = user.AuthType
         };
 
+        if (user.IsBlocked == true)
+        {
+            return (false, "Your account is blocked please try again latter.", null);
+        }
+
+        if(DateTime.Now.Date >= user.PasswordExpiryDate)
+        {
+            
+            return (false, "Password is Expired.", null);
+        }
         if (user.IsTwoFaEnabled == true && user.AuthType == (int)AuthType.AuthTypeEnum.Email)
         {
             await SendOtp(dto.Email);
             return (true, "2FA is enabled.", userData);
         }
 
-        if (user.IsBlocked == true)
-        {
-            return (false, "Your account is blocked please try again latter.", null);
-        }
         return (true, "User Logged in successfully.", userData);
     }
 
@@ -242,11 +302,35 @@ public class AuthenticationService : IAuthenticationService
         return true;
     }
 
-    public async Task<UserDto?> Login2Fa(OtpModel dto)
+    public async Task<(bool, string, UserDto?)> Login2Fa(OtpModel dto)
     {
         User? user = await _userRepository.GetByEmailAsync(dto.Email);
         if (user == null || user.Email == null || !_otpService.Validate(user.Email, dto.OTP))
-            return null;
+        {
+            if (user != null)
+            {
+                user.InvalidLoginAttempts += 1;
+                if (user.IsBlocked == true)
+                {
+                    return (false, "Your account is blocked try again later.", null);
+                }
+                int userLockout = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.UserLockup) ?? "5");
+                if (user.InvalidLoginAttempts >= userLockout)
+                {
+                    // user.IsBlocked = true;
+                    // user.BlockedAt = DateTime.Now;
+                    await _userRepository.UpdateUserAsync(user);
+                    await SendOtp(user.Email!);
+                    return (false, "OTP sent to your email now login through that code.", null);
+                }
+
+                await _userRepository.UpdateUserAsync(user);
+            }
+            return (false, "Invalid code.", null);
+        }
+
+        if (user.IsBlocked == true)
+            return (false, "Your account is blocked please try again latter.", null);
         UserDto userData = new()
         {
             Id = user.Id,
@@ -263,7 +347,8 @@ public class AuthenticationService : IAuthenticationService
             IsTwoFaEnabled = user.IsTwoFaEnabled,
             AuthType = user.AuthType
         };
-        return userData;
+
+        return (true, "Logged In successfully.", userData);
     }
 
     private static string HashPassword(string password)
@@ -322,7 +407,7 @@ public class AuthenticationService : IAuthenticationService
     }
 
     public async Task<string> GenerateResetToken(string email)
-    {   
+    {
         int ResetPasswordLinkExpiry = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.ResetPasswordLinkExpiry) ?? "24");
         DateTime expiry = DateTime.UtcNow.AddHours(ResetPasswordLinkExpiry);
         string tokenData = $"{email} | {expiry.Ticks}";
@@ -396,6 +481,29 @@ public class AuthenticationService : IAuthenticationService
                 {
                     user.IsBlocked = false;
                     user.BlockedAt = null;
+                    user.InvalidLoginAttempts = 0;
+                    user.LastInvalidAttemptAt = null;
+                    await _userRepository.UpdateUserAsync(user);
+                }
+            }
+        }
+    }
+
+    public async System.Threading.Tasks.Task ResetInvalidLoginAttempt()
+    {
+        List<User> users = await _userRepository.GetUsers();
+
+        foreach (var user in users)
+        {
+            if (user.InvalidLoginAttempts > 0 && user.IsBlocked == false)
+            {
+                DateTime currentTime = DateTime.Now;
+                int LockupDuration = int.Parse((await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.LockupDuration))!);
+                // if (currentTime.Date >= user.LastInvalidAttemptAt!.Value.Date.AddDays(1))
+                if (user.LastInvalidAttemptAt.HasValue && currentTime.Subtract((DateTime)user.LastInvalidAttemptAt).TotalMinutes >= LockupDuration)
+                {
+                    user.InvalidLoginAttempts = 0;
+                    user.LastInvalidAttemptAt = null;
                     await _userRepository.UpdateUserAsync(user);
                 }
             }

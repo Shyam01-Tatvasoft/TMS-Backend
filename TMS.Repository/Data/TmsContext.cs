@@ -516,6 +516,9 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.FkCountryId).HasColumnName("fk_country_id");
             entity.Property(e => e.FkCountryTimezone).HasColumnName("fk_country_timezone");
             entity.Property(e => e.FkRoleId).HasColumnName("fk_role_id");
+            entity.Property(e => e.InvalidLoginAttempts)
+                .HasDefaultValueSql("0")
+                .HasColumnName("invalid_login_attempts");
             entity.Property(e => e.IsBlocked)
                 .HasDefaultValueSql("false")
                 .HasColumnName("is_blocked");
@@ -525,6 +528,9 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.IsTwoFaEnabled)
                 .HasDefaultValueSql("false")
                 .HasColumnName("is_two_fa_enabled");
+            entity.Property(e => e.LastInvalidAttemptAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("last_invalid_attempt_at");
             entity.Property(e => e.LastName)
                 .HasMaxLength(100)
                 .HasColumnName("last_name");
@@ -534,6 +540,10 @@ public partial class TmsContext : DbContext
             entity.Property(e => e.Password)
                 .HasMaxLength(200)
                 .HasColumnName("password");
+            entity.Property(e => e.PasswordExpiryDate)
+                .HasDefaultValueSql("now()")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("password_expiry_date");
             entity.Property(e => e.Phone)
                 .HasMaxLength(20)
                 .IsFixedLength()

@@ -14,4 +14,8 @@ public class SystemConfigs
     public const string LockupDuration = "LockupDuration";
     public const string ResetPasswordLinkExpiry = "ResetPasswordLinkExpiry";
     public const string HolidayApi = "HolidayApi";
+    public const string ResetPasswordUrl = "ResetPasswordUrl";
+    public const string SetupPasswordUrl = "SetupPasswordUrl";
+    public const string UserLockup = "UserLockup";
+    public const string PasswordExpiryDuration = "PasswordExpiryDuration";
 }

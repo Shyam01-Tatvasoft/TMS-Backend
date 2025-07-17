@@ -1,3 +1,4 @@
+using Org.BouncyCastle.X509.Store;
 using TMS.Repository.Data;
 using TMS.Repository.Dtos;
 using TMS.Repository.Interfaces;
@@ -38,7 +39,9 @@ public class SystemConfigurationService : ISystemConfigurationService
             UserLockup = int.Parse(configs.Find(c => c.ConfigName == "UserLockup")?.ConfigValue!),
             ResetPasswordLinkExpiry = int.Parse(configs.Find(c => c.ConfigName == "ResetPasswordLinkExpiry")?.ConfigValue!),
             SetupPasswordLinkExpiry = int.Parse(configs.Find(c => c.ConfigName == "SetupPasswordLinkExpiry")?.ConfigValue!),
-            PasswordExpiryDuration = int.Parse(configs.Find(c => c.ConfigName == "PasswordExpiryDuration")?.ConfigValue!)
+            PasswordExpiryDuration = int.Parse(configs.Find(c => c.ConfigName == "PasswordExpiryDuration")?.ConfigValue!),
+            ResetPasswordUrl = configs.Find(c => c.ConfigName == "ResetPasswordUrl")?.ConfigValue!,
+            SetupPasswordUrl = configs.Find(c => c.ConfigName == "SetupPasswordUrl")?.ConfigValue!
         };
 
         ExternalConfigDto externalConfigs = new()
@@ -52,18 +55,18 @@ public class SystemConfigurationService : ISystemConfigurationService
             LoginConfigs = loginConfigs,
             ExternalConfigs = externalConfigs
         };
-       return systemConfigs;
+        return systemConfigs;
     }
 
     public async System.Threading.Tasks.Task UpdateSystemConfiguration(List<ConfigurationDto> systemConfigs)
     {
         List<SystemConfiguration> configs = await _systemConfigRepository.GetAllConfigsAsync();
-        foreach (var systemConfigDto in systemConfigs)  
+        foreach (var systemConfigDto in systemConfigs)
         {
             var name = systemConfigDto.Name;
             var newName = char.ToUpper(name[0]) + name.Substring(1);
             var existingConfig = configs.Find(c => c.ConfigName == newName);
-            if( existingConfig != null)
+            if (existingConfig != null)
             {
                 existingConfig.ConfigValue = systemConfigDto.Value;
                 existingConfig.UpdatedAt = DateTime.Now;
@@ -81,5 +84,15 @@ public class SystemConfigurationService : ISystemConfigurationService
         }
 
         await _systemConfigRepository.RefreshCacheAsync();
+    }
+
+    public async Task<(bool, string)> GetConfigByNameAsync(string name)
+    {
+        string? configValue = await _systemConfigRepository.GetConfigByNameAsync(name);
+        if (string.IsNullOrEmpty(configValue))
+        {
+            return (false, "Configuration not found.");
+        }
+        return (true, configValue);
     }
 }

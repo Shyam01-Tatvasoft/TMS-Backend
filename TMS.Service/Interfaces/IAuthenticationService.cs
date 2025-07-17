@@ -15,7 +15,9 @@ public interface IAuthenticationService
     public Task<(bool, string, UserDto?)> VerifyOtp(OtpModel model);
     public Task<string?> Setup2FA(SetupAuthDto dto);
     public Task<bool> Enable2Fa(Enable2FaDto dto);
-    public Task<UserDto?> Login2Fa(OtpModel dto);
+    public Task<(bool, string, UserDto?)> Login2Fa(OtpModel dto);
     public Task<bool> BlockUserAccount(string email);
     public System.Threading.Tasks.Task UnblockUser();
+    public System.Threading.Tasks.Task ResetInvalidLoginAttempt();
+    public Task<User> ChangePasswordAsync(ChangePasswordDto dto);
 }

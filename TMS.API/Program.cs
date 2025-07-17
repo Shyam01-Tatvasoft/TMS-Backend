@@ -198,6 +198,12 @@ using (var scope = app.Services.CreateScope())
         () => authService.UnblockUser(),
         "*/1 * * * *",
         new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
+    
+    jobManager.AddOrUpdate(
+        "unblock-user",
+        () => authService.ResetInvalidLoginAttempt(),
+        "*/1 * * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time") });
 }
 
 app.Run();

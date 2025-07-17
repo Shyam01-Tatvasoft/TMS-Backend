@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +24,7 @@ public class SystemConfigurationController : ControllerBase
         _jwtService = jwtService;
     }
 
-    [HttpGet]
+    [HttpGet("get-all")]
     [ProducesResponseType(typeof(SystemConfigurationDto), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
@@ -37,7 +38,7 @@ public class SystemConfigurationController : ControllerBase
             return Unauthorized();
         }
         var (email, role, userId) = _jwtService.ValidateToken(authToken);
-        if(role != "Admin")
+        if (role != "Admin")
         {
             return Forbid("You do not have permission to access this resource.");
         }
@@ -97,9 +98,29 @@ public class SystemConfigurationController : ControllerBase
         }
     }
 
-    [HttpGet("result")]
-    public Task<IActionResult> GetResult()
+    [HttpGet]
+    [ProducesResponseType(typeof(string),200)]
+    [AllowAnonymous]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    public async Task<IActionResult> GetConfigurationByName(string name)
     {
-        return Task.FromResult<IActionResult>(Ok("Result from GetResult method"));
+        string? userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        try
+        {
+            var (success, data) = await _systemConfigurationService.GetConfigByNameAsync(name);
+            await _logService.LogAsync("Get configuration by name.", string.IsNullOrEmpty(userId) ? 0 : int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), string.Empty, name);
+            if (!success)
+            {
+                return BadRequest(data);
+            }
+            return Ok(data);
+        }
+        catch (System.Exception ex)
+        {
+            await _logService.LogAsync("Get configuration by name.", string.IsNullOrEmpty(userId) ? 0 : int.Parse(userId!), Repository.Enums.Log.LogEnum.Read.ToString(), ex.StackTrace, name);
+            return StatusCode(500, "An error occurred while fetching system configuration.");
+        }
     }
 }
