@@ -144,6 +144,7 @@ public class UserRepository : IUserRepository
         existingUser.Username = user.Username;
         existingUser.ModifiedAt = user.ModifiedAt;
         existingUser.ProfileImage = user.ProfileImagePath;
+        existingUser.PasswordExpiryDate = user.PasswordExpiryDate;
         await _context.SaveChangesAsync();
         return true;
     }

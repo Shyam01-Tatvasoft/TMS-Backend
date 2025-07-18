@@ -64,6 +64,7 @@ builder.Services.AddScoped<ITaskActionRepository,TaskActionRepository>();
 builder.Services.AddScoped<ILogRepository, LogRepository>();
 builder.Services.AddScoped<IUserOtpRepository, UserOtpRepository>();
 builder.Services.AddScoped<ISystemConfigurationRepository, SystemConfigurationRepository>();
+builder.Services.AddScoped<IEmailTemplatesRepository, EmailTemplatesRepository>();
 builder.Services.AddHttpClient<CountryRepository>();
 
 

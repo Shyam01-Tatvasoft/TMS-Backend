@@ -9,7 +9,7 @@ public interface IAuthenticationService
     public Task<(bool, string, UserDto?)> LoginAsync(UserLoginDto dto);
     public Task<string> GenerateResetToken(string email);
     public Task<string?> ValidateResetToken(string token, string validationType);
-    public Task<User> ResetPasswordAsync(string email, ResetPasswordDto dto);
+    public Task<(bool, string)> ResetPasswordAsync(string email, ResetPasswordDto dto);
     public Task<(string, int)> ForgotPassword(string email);
     public Task<bool> SendOtp(string email);
     public Task<(bool, string, UserDto?)> VerifyOtp(OtpModel model);
@@ -19,5 +19,5 @@ public interface IAuthenticationService
     public Task<bool> BlockUserAccount(string email);
     public System.Threading.Tasks.Task UnblockUser();
     public System.Threading.Tasks.Task ResetInvalidLoginAttempt();
-    public Task<User> ChangePasswordAsync(ChangePasswordDto dto);
+    public Task<(bool, string)> ChangePasswordAsync(ChangePasswordDto dto);
 }

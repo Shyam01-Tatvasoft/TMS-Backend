@@ -21,6 +21,8 @@ public partial class TmsContext : DbContext
 
     public virtual DbSet<CountryTimezone> CountryTimezones { get; set; }
 
+    public virtual DbSet<EmailTemplate> EmailTemplates { get; set; }
+
     public virtual DbSet<Hash> Hashes { get; set; }
 
     public virtual DbSet<Job> Jobs { get; set; }
@@ -129,6 +131,21 @@ public partial class TmsContext : DbContext
             entity.HasOne(d => d.FkCountry).WithMany(p => p.CountryTimezones)
                 .HasForeignKey(d => d.FkCountryId)
                 .HasConstraintName("timezone_country_id_fkey");
+        });
+
+        modelBuilder.Entity<EmailTemplate>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("email_templates_pkey");
+
+            entity.ToTable("email_templates");
+
+            entity.HasIndex(e => e.Name, "email_templates_name_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Body).HasColumnName("body");
+            entity.Property(e => e.Name)
+                .HasMaxLength(100)
+                .HasColumnName("name");
         });
 
         modelBuilder.Entity<Hash>(entity =>

@@ -160,35 +160,26 @@ public class AuthenticationController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
-            return BadRequest(_response);
+            return BadRequest(ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList());
         }
 
         string? email = await _autService.ValidateResetToken(dto.Token, dto.Type);
         if (string.IsNullOrEmpty(email))
         {
-            _response.IsSuccess = false;
-            _response.ErrorMessage = new List<string> { "Your token is expired" };
-            return BadRequest(_response);
+            return BadRequest("Your token is expired");
         }
 
         try
         {
-            User result = await _autService.ResetPasswordAsync(email, dto);
-            if (result == null)
+            var (success,message) = await _autService.ResetPasswordAsync(email, dto);
+            if (!success)
             {
-                _response.StatusCode = HttpStatusCode.BadRequest;
-                _response.IsSuccess = false;
-                _response.ErrorMessage = new List<string> { "Failed to reset password" };
                 await _logService.LogAsync("Setup password failed.", 0, Repository.Enums.Log.LogEnum.Exception.ToString(), "", JsonSerializer.Serialize(dto));
-                return BadRequest(_response);
+                return BadRequest(message);
             }
 
-            _response.StatusCode = HttpStatusCode.OK;
-            _response.Result = "Password reset successfully";
-            await _logService.LogAsync("Setup password successfully.", result.Id, Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(dto));
-            return Ok(_response);
+            await _logService.LogAsync("Setup password successfully.", 0, Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(dto));
+            return Ok(message);
         }
         catch (System.Exception ex)
         {
@@ -415,14 +406,14 @@ public class AuthenticationController : ControllerBase
     {
         try
         {
-            User user = await _autService.ChangePasswordAsync(model);
-            if(user != null)
+            var (success,message) = await _autService.ChangePasswordAsync(model);
+            if(success)
             {
                 await _logService.LogAsync("Change password.", 0, Repository.Enums.Log.LogEnum.Update.ToString(), string.Empty, JsonSerializer.Serialize(model));
-                return Ok("Password Changed Successfully !");
+                return Ok(message);
             }
             else 
-                return BadRequest("Error occurred while changing password.");
+                return BadRequest(message);
         }
         catch (System.Exception ex)
         {

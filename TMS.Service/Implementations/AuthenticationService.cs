@@ -60,7 +60,7 @@ public class AuthenticationService : IAuthenticationService
         string? setupPath = await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.SetupPasswordUrl);
         var resetLink = setupPath + resetToken;
         string subject = "Password setup request";
-        string body = GetEmailTemplate(resetLink, "SetupPasswordTemplate");
+        string body = await GetEmailTemplate(resetLink, "Forgot Password Template");
         SendMail(dto.Email, subject, body);
         return ("Account created successfully.", user.Id);
     }
@@ -74,14 +74,18 @@ public class AuthenticationService : IAuthenticationService
         string? resetPath = await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.ResetPasswordUrl);
         var resetLink = resetPath + resetToken;
         string subject = "Password reset request";
-        string body = GetEmailTemplate(resetLink, "ForgotPasswordTemplate");
+        string body = await GetEmailTemplate(resetLink, "Forgot Password Template");
         SendMail(email, subject, body);
         return ("Mail sent successfully.", existing.Id);
     }
 
-    public async Task<User> ResetPasswordAsync(string email, ResetPasswordDto dto)
+    public async Task<(bool, string)> ResetPasswordAsync(string email, ResetPasswordDto dto)
     {
         User? user = await _userRepository.GetByEmailAsync(email);
+        if (VerifyPassword(dto.NewPassword, user?.Password))
+        {
+            return (false, "New password must be different from the old password.");
+        }
         user!.Password = HashPassword(dto.NewPassword);
         int PasswordExpiryDuration = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.PasswordExpiryDuration) ?? "60");
         AddEditUserDto userData = new()
@@ -101,14 +105,20 @@ public class AuthenticationService : IAuthenticationService
         };
         bool response = await _userRepository.UpdateAsync(userData);
         if (response)
-            return user;
+            return (true, "Password reset successfully.");
         else
-            return null!;
+            return (false, "Failed to reset password.");
     }
 
-    public async Task<User> ChangePasswordAsync(ChangePasswordDto dto)
+    public async Task<(bool, string)> ChangePasswordAsync(ChangePasswordDto dto)
     {
         User? user = await _userRepository.GetByEmailAsync(dto.Email);
+
+        if (VerifyPassword(dto.NewPassword, user?.Password))
+        {
+            return (false, "New password must be different from the old password.");
+        }
+
         user!.Password = HashPassword(dto.NewPassword);
         int PasswordExpiryDuration = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.PasswordExpiryDuration) ?? "60");
         AddEditUserDto userData = new()
@@ -128,9 +138,9 @@ public class AuthenticationService : IAuthenticationService
         };
         bool response = await _userRepository.UpdateAsync(userData);
         if (response)
-            return user;
+            return (true, "Password changed successfully.");
         else
-            return null!;
+            return (false, "Failed to change password.");
     }
 
     public async Task<(bool, string, UserDto?)> LoginAsync(UserLoginDto dto)
@@ -182,9 +192,8 @@ public class AuthenticationService : IAuthenticationService
             return (false, "Your account is blocked please try again latter.", null);
         }
 
-        if(DateTime.Now.Date >= user.PasswordExpiryDate)
+        if (DateTime.Now.Date >= user.PasswordExpiryDate)
         {
-            
             return (false, "Password is Expired.", null);
         }
         if (user.IsTwoFaEnabled == true && user.AuthType == (int)AuthType.AuthTypeEnum.Email)
@@ -317,8 +326,6 @@ public class AuthenticationService : IAuthenticationService
                 int userLockout = int.Parse(await _systemConfigurationRepository.GetConfigByNameAsync(SystemConfigs.UserLockup) ?? "5");
                 if (user.InvalidLoginAttempts >= userLockout)
                 {
-                    // user.IsBlocked = true;
-                    // user.BlockedAt = DateTime.Now;
                     await _userRepository.UpdateUserAsync(user);
                     await SendOtp(user.Email!);
                     return (false, "OTP sent to your email now login through that code.", null);
@@ -364,22 +371,14 @@ public class AuthenticationService : IAuthenticationService
         return HashPassword(password) == storedHash;
     }
 
-    private static string GetEmailTemplate(string ResetLink, string templateName)
+    public async Task<string> GetEmailTemplate(string ResetLink, string templateName)
     {
-        string templatePath = "";
-        if (templateName == "ForgotPasswordTemplate")
+        var template = await _emailService.GetEmailTemplateByName(templateName);
+        var values = new Dictionary<string, string>
         {
-            templatePath = "d:/TMS/TMS.Service/Templates/ResetPasswordMailTemplate.html";
-        }
-        else
-        {
-            templatePath = "d:/TMS/TMS.Service/Templates/EmailTemplate.html";
-        }
-        if (!System.IO.File.Exists(templatePath))
-        {
-            return "<p>Email template Not Fount</p>";
-        }
-        string emailbody = System.IO.File.ReadAllText(templatePath);
+            { "Link", ResetLink },
+        };
+        string emailbody = _emailService.BuildBody(template?.Body!,values);
         return emailbody.Replace("{{Link}}", ResetLink);
     }
 
